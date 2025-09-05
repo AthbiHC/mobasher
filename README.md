@@ -21,19 +21,58 @@
 ## Project Structure
 
 ```
-├── docs/                 # Documentation
-├── mobasher/            # Main application code
-├── channels/            # Channel configuration files
-├── ingestion/           # Stream capture and processing
-├── asr/                 # Speech recognition workers
-├── vision/              # Computer vision analysis
-├── storage/             # Database models and management
-└── monitoring/          # Observability and dashboards
+├── docs/                           # Documentation
+└── mobasher/                       # Main application code
+    ├── channels/                   # Channel configuration files
+    ├── ingestion/                  # Stream capture and processing
+    ├── asr/                        # Speech recognition workers
+    ├── vision/                     # Computer vision analysis
+    ├── storage/                    # Database models and management
+    ├── orchestration/              # Celery tasks and scheduling
+    ├── monitoring/                 # Observability and dashboards
+    ├── analysis/                   # Content analysis and embeddings
+    ├── data/                       # Runtime data storage
+    │   ├── audio/                  # Audio segments
+    │   └── recordings/             # Video recordings (optional)
+    ├── state/                      # System state and metrics
+    ├── docker/                     # Docker configurations
+    ├── tests/                      # Test files
+    └── requirements.txt            # Python dependencies
 ```
 
 ## Getting Started
 
-This project is currently in early development. Check the `docs/` folder for detailed documentation.
+### Prerequisites
+- Python 3.9+
+- Docker and Docker Compose
+- FFmpeg
+- CUDA-compatible GPU (recommended for optimal performance)
+
+### Quick Setup
+```bash
+# Clone the repository
+git clone https://github.com/AthbiHC/mobasher.git
+cd mobasher
+
+# Switch to development branch
+git checkout alpha-001
+
+# Set up Python environment
+cd mobasher
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# Start infrastructure services
+cd docker
+docker-compose up -d postgres redis
+
+# Configure your first channel
+cp channels/kuwait1.yaml channels/my-channel.yaml
+# Edit channels/my-channel.yaml with your stream URL
+```
+
+For detailed documentation, check the `docs/` folder.
 
 ## Contributing
 

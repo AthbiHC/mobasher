@@ -1,0 +1,62 @@
+id: kuwait1
+name: Kuwait TV 1
+description: Official Kuwait Television Channel 1
+
+input:
+  url: "https://kwtktv1ta.cdn.mangomolo.com/ktv1/smil:ktv1.stream.smil/chunklist.m3u8"
+  headers:
+    Referer: "https://www.elahmad.com/"
+    User-Agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+  
+recording:
+  segment_seconds: 60
+  archive_mkv: false
+  reconnect_attempts: 5
+  reconnect_delay_max: 10
+
+audio:
+  sample_rate: 16000
+  channels: 1
+  format: "pcm_s16le"
+
+asr:
+  model: "large-v3"
+  language: "ar"
+  beam_size: 5
+  vad_enabled: true
+  word_timestamps: true
+  condition_on_previous_text: true
+
+vision:
+  enabled: true
+  fps:
+    ocr: 1
+    objects: 2
+    faces: 1
+    scene_detection: 0.5
+  
+  models:
+    object_detection: "yolov8s.onnx"
+    face_recognition: "buffalo_l"
+    ocr_model: "arabic"
+  
+  face_gallery: "data/face_gallery/"
+  confidence_thresholds:
+    objects: 0.5
+    faces: 0.6
+    ocr: 0.7
+
+analysis:
+  embed_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  topic_detection: true
+  speaker_diarization: false
+  
+storage:
+  media_root: "data/"
+  retention_days: 30
+  compression_enabled: true
+
+monitoring:
+  metrics_enabled: true
+  health_check_interval: 30
+  log_level: "INFO"
