@@ -519,7 +519,11 @@ def load_channel_config(config_path: str) -> Dict[str, Any]:
 async def main():
     parser = argparse.ArgumentParser(description='Mobasher Dual HLS Recorder')
     parser.add_argument('--config', default='../channels/kuwait1.yaml', help='Path to channel YAML config')
-    parser.add_argument('--data-root', default='../data', help='Path to data root directory')
+    parser.add_argument(
+        '--data-root',
+        default=os.environ.get('MOBASHER_DATA_ROOT', '../data'),
+        help='Path to data root directory (or set MOBASHER_DATA_ROOT)'
+    )
     parser.add_argument('--duration', type=int, default=0, help='Run duration in seconds (0 means run continuously)')
     parser.add_argument('--heartbeat', type=int, default=30, help='Heartbeat log interval in seconds')
     args = parser.parse_args()
