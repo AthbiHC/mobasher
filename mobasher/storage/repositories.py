@@ -1,0 +1,263 @@
+"""
+Typed repository helpers for common DB operations.
+
+These helpers wrap SQLAlchemy ORM operations with clear, typed functions
+to simplify usage across services and CLIs.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone, timedelta
+from typing import Iterable, List, Optional, Tuple
+from uuid import UUID, uuid4
+
+from sqlalchemy import Select, and_, desc, func, select
+from sqlalchemy.orm import Session
+
+from .models import (
+    Base,
+    Channel,
+    Recording,
+    Segment,
+    Transcript,
+)
+
+
+# -------------------- Channels --------------------
+
+def upsert_channel(
+    db: Session,
+    *,
+    channel_id: str,
+    name: str,
+    url: str,
+    headers: Optional[dict] = None,
+    active: bool = True,
+    description: Optional[str] = None,
+) -> Channel:
+    channel = db.get(Channel, channel_id)
+    if channel is None:
+        channel = Channel(
+            id=channel_id,
+            name=name,
+            url=url,
+            headers=headers or {},
+            active=active,
+            description=description,
+        )
+        db.add(channel)
+    else:
+        channel.name = name
+        channel.url = url
+        channel.headers = headers or {}
+        channel.active = active
+        channel.description = description
+        db.add(channel)
+    db.commit()
+    db.refresh(channel)
+    return channel
+
+
+def get_channel(db: Session, channel_id: str) -> Optional[Channel]:
+    return db.get(Channel, channel_id)
+
+
+def list_channels(db: Session, *, active_only: bool = False, limit: int = 100) -> List[Channel]:
+    stmt: Select = select(Channel)
+    if active_only:
+        stmt = stmt.where(Channel.active.is_(True))
+    stmt = stmt.order_by(Channel.created_at.asc()).limit(limit)
+    return list(db.execute(stmt).scalars().all())
+
+
+# -------------------- Recordings --------------------
+
+def create_recording(
+    db: Session,
+    *,
+    channel_id: str,
+    started_at: Optional[datetime] = None,
+    status: str = "running",
+    error_message: Optional[str] = None,
+) -> Recording:
+    if started_at is None:
+        started_at = datetime.now(timezone.utc)
+    rec = Recording(
+        id=uuid4(),
+        channel_id=channel_id,
+        started_at=started_at,
+        status=status,
+        error_message=error_message,
+    )
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    return rec
+
+
+def complete_recording(
+    db: Session,
+    *,
+    recording_id: UUID,
+    started_at: datetime,
+    ended_at: Optional[datetime] = None,
+    status: str = "completed",
+) -> Optional[Recording]:
+    rec = db.get(Recording, (recording_id, started_at))
+    if rec is None:
+        return None
+    rec.ended_at = ended_at or datetime.now(timezone.utc)
+    rec.status = status
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    return rec
+
+
+def list_recent_recordings(
+    db: Session,
+    *,
+    channel_id: Optional[str] = None,
+    since: Optional[datetime] = None,
+    limit: int = 50,
+) -> List[Recording]:
+    stmt: Select = select(Recording)
+    if channel_id:
+        stmt = stmt.where(Recording.channel_id == channel_id)
+    if since:
+        stmt = stmt.where(Recording.started_at >= since)
+    stmt = stmt.order_by(desc(Recording.started_at)).limit(limit)
+    return list(db.execute(stmt).scalars().all())
+
+
+# -------------------- Segments --------------------
+
+def upsert_segment(
+    db: Session,
+    *,
+    segment_id: UUID,
+    recording_id: UUID,
+    channel_id: str,
+    started_at: datetime,
+    ended_at: datetime,
+    audio_path: Optional[str],
+    video_path: Optional[str],
+    file_size_bytes: Optional[int],
+    status: str = "completed",
+) -> Segment:
+    seg = db.get(Segment, (segment_id, started_at))
+    if seg is None:
+        seg = Segment(
+            id=segment_id,
+            recording_id=recording_id,
+            channel_id=channel_id,
+            started_at=started_at,
+            ended_at=ended_at,
+            audio_path=audio_path,
+            video_path=video_path,
+            file_size_bytes=file_size_bytes,
+            status=status,
+        )
+        db.add(seg)
+    else:
+        # Update only if provided
+        if audio_path and not seg.audio_path:
+            seg.audio_path = audio_path
+        if video_path and not seg.video_path:
+            seg.video_path = video_path
+        if file_size_bytes and (not seg.file_size_bytes or file_size_bytes > seg.file_size_bytes):
+            seg.file_size_bytes = file_size_bytes
+        seg.ended_at = ended_at
+        seg.status = status
+        db.add(seg)
+    db.commit()
+    db.refresh(seg)
+    return seg
+
+
+def list_segments(
+    db: Session,
+    *,
+    channel_id: Optional[str] = None,
+    start: Optional[datetime] = None,
+    end: Optional[datetime] = None,
+    limit: int = 200,
+) -> List[Segment]:
+    stmt: Select = select(Segment)
+    if channel_id:
+        stmt = stmt.where(Segment.channel_id == channel_id)
+    if start:
+        stmt = stmt.where(Segment.started_at >= start)
+    if end:
+        stmt = stmt.where(Segment.started_at < end)
+    stmt = stmt.order_by(desc(Segment.started_at)).limit(limit)
+    return list(db.execute(stmt).scalars().all())
+
+
+# -------------------- Transcripts --------------------
+
+def upsert_transcript(
+    db: Session,
+    *,
+    segment_id: UUID,
+    segment_started_at: datetime,
+    text: str,
+    language: str = "ar",
+    confidence: Optional[float] = None,
+    model_name: str = "unknown",
+    model_version: Optional[str] = None,
+    words: Optional[list] = None,
+    processing_time_ms: Optional[int] = None,
+) -> Transcript:
+    tr = db.get(Transcript, (segment_id, segment_started_at))
+    if tr is None:
+        tr = Transcript(
+            segment_id=segment_id,
+            segment_started_at=segment_started_at,
+            language=language,
+            text=text,
+            words=words,
+            confidence=confidence,
+            model_name=model_name,
+            model_version=model_version,
+            processing_time_ms=processing_time_ms,
+        )
+        db.add(tr)
+    else:
+        tr.text = text
+        tr.language = language
+        tr.confidence = confidence
+        tr.model_name = model_name
+        tr.model_version = model_version
+        tr.words = words
+        tr.processing_time_ms = processing_time_ms
+        db.add(tr)
+    db.commit()
+    db.refresh(tr)
+    return tr
+
+
+def list_recent_transcripts(
+    db: Session,
+    *,
+    channel_id: Optional[str] = None,
+    since: Optional[datetime] = None,
+    limit: int = 100,
+) -> List[Tuple[Segment, Transcript]]:
+    # Join on composite keys via manual where conditions
+    seg_stmt = select(Segment)
+    if channel_id:
+        seg_stmt = seg_stmt.where(Segment.channel_id == channel_id)
+    if since:
+        seg_stmt = seg_stmt.where(Segment.started_at >= since)
+    seg_stmt = seg_stmt.order_by(desc(Segment.started_at)).limit(limit)
+    segments = list(db.execute(seg_stmt).scalars().all())
+    results: List[Tuple[Segment, Transcript]] = []
+    for seg in segments:
+        tr = db.get(Transcript, (seg.id, seg.started_at))
+        if tr is not None:
+            results.append((seg, tr))
+    return results
+
+
