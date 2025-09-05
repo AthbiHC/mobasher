@@ -22,6 +22,9 @@
 
 ```
 ├── docs/                           # Documentation
+│   ├── Main-Document.md            # Comprehensive technical documentation
+│   ├── PROJECT-JOURNAL.md          # Development progress and decisions
+│   └── TODO.md                     # Current priorities and tasks
 └── mobasher/                       # Main application code
     ├── channels/                   # Channel configuration files
     ├── ingestion/                  # Stream capture and processing
@@ -72,7 +75,26 @@ cp channels/kuwait1.yaml channels/my-channel.yaml
 # Edit channels/my-channel.yaml with your stream URL
 ```
 
-For detailed documentation, check the `docs/` folder.
+## Documentation
+
+- **[Main Documentation](docs/Main-Document.md)** - Comprehensive technical overview
+- **[Project Journal](docs/PROJECT-JOURNAL.md)** - Development progress and architectural decisions
+- **[TODO List](docs/TODO.md)** - Current priorities and development roadmap
+
+## Development Workflow
+
+This project uses productivity commands for efficient development:
+- Context is maintained across sessions through structured documentation
+- Progress is tracked in `docs/PROJECT-JOURNAL.md`
+- Current priorities are managed in `docs/TODO.md`
+- Branch naming follows `alpha-XXX` pattern for development
+
+## Current Status
+
+🔄 **In Development** - Currently implementing core system architecture
+📋 **Next Milestone** - MVP with single-channel Arabic audio processing
+
+See [TODO.md](docs/TODO.md) for detailed current priorities.
 
 ## Contributing
 
