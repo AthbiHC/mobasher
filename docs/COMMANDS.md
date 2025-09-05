@@ -2,7 +2,16 @@
 
 This document catalogs common commands and workflows for developing, running, and maintaining Mobasher.
 
-## 1) Repository Workflow (custom assistant commands)
+## 1) CLI
+
+- Preferred usage via wrapper: `./scripts/mediaview --help`
+- Examples:
+  - Start recorder: `./scripts/mediaview recorder start --config mobasher/channels/kuwait1.yaml`
+  - Status/Stop: `./scripts/mediaview recorder status` / `./scripts/mediaview recorder stop`
+  - Truncate DB: `./scripts/mediaview db truncate --yes`
+  - Retention: `./scripts/mediaview db retention --dry-run`
+
+## 2) Repository Workflow (custom assistant commands)
 
 - "push the push": Updates docs as needed, commits all changes, pushes to current branch, then creates and switches to the next sequential `alpha-XXX` branch.
 - "sync docs": Updates README and docs to reflect changes, commits with a docs message, and pushes to the current branch (no branch switching).
@@ -13,7 +22,7 @@ This document catalogs common commands and workflows for developing, running, an
 
 Note: These are workflow shortcuts we use with the assistant. Their effects are described above; when needed, use the concrete shell commands below.
 
-## 2) Recorder
+## 3) Recorder
 
 - Start background recorder (local dev):
 ```bash
@@ -37,7 +46,7 @@ cd mobasher/ingestion && tail -f recorder.log
 pgrep -af 'ingestion/recorder.py' || echo "Recorder not running"
 ```
 
-## 3) Database
+## 4) Database
 
 - DBeaver connection (local):
   - Host: localhost
@@ -73,7 +82,7 @@ python -m mobasher.storage.retention_jobs --yes --retain-transcripts-days 365 --
 - Environment variables (optional overrides):
   - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE`
 
-## 4) Docker services (local dev)
+## 5) Docker services (local dev)
 
 - Start Postgres + Redis:
 ```bash
@@ -85,7 +94,7 @@ docker-compose up -d postgres redis
 docker-compose down
 ```
 
-## 5) Tests
+## 6) Tests
 
 - Install test dependencies (inside venv):
 ```bash
@@ -97,7 +106,7 @@ pip install -r mobasher/requirements.txt
 PYTHONPATH=. mobasher/venv/bin/python -m pytest -q mobasher/tests/test_db_integration.py
 ```
 
-## 6) General setup
+## 7) General setup
 
 - Create/activate venv and install packages:
 ```bash
@@ -114,7 +123,7 @@ source venv/bin/activate
 alembic upgrade head
 ```
 
-## 7) Notes
+## 8) Notes
 
 - Recorder writes `recordings` and `segments` to DB by default.
 - `pgvector` and TimescaleDB are used in dev; migrations ensure extensions/policies in the main DB.

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Resolve repo root relative to this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="${SCRIPT_DIR%/scripts}"
+
+PYTHON_BIN="${REPO_ROOT}/mobasher/venv/bin/python"
+
+if [ ! -x "$PYTHON_BIN" ]; then
+  echo "Python venv not found at mobasher/venv. Please create it and install requirements:" >&2
+  echo "  python3 -m venv mobasher/venv && mobasher/venv/bin/pip install -r mobasher/requirements.txt" >&2
+  exit 1
+fi
+
+export PYTHONPATH="${REPO_ROOT}"
+exec "$PYTHON_BIN" -m mobasher.cli.main "$@"
+
+
