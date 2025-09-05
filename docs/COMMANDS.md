@@ -1,0 +1,105 @@
+# Mobasher System Commands
+
+This document catalogs common commands and workflows for developing, running, and maintaining Mobasher.
+
+## 1) Repository Workflow (custom assistant commands)
+
+- "push the push": Updates docs as needed, commits all changes, pushes to current branch, then creates and switches to the next sequential `alpha-XXX` branch.
+- "sync docs": Updates README and docs to reflect changes, commits with a docs message, and pushes to the current branch (no branch switching).
+- "fresh branch": Creates a new branch with `feature/<name>` or `fix/<name>`.
+- "status check": Shows git status, recent commits, and a quick project structure overview.
+- "quick test": Runs basic validation (lint/format/tests) suitable for fast feedback.
+- "deploy prep": Prepares a release (versions, configs, changelog, verification).
+
+Note: These are workflow shortcuts we use with the assistant. Their effects are described above; when needed, use the concrete shell commands below.
+
+## 2) Recorder
+
+- Start background recorder (local dev):
+```bash
+cd mobasher/ingestion
+source ../venv/bin/activate
+nohup python recorder.py --config ../channels/kuwait1.yaml --data-root ../data --heartbeat 15 > recorder.log 2>&1 &
+```
+- Stop recorder:
+```bash
+pkill -f 'ingestion/recorder.py' || true
+```
+- Tail logs:
+```bash
+cd mobasher/ingestion && tail -f recorder.log
+```
+
+## 3) Database
+
+- DBeaver connection (local):
+  - Host: localhost
+  - Port: 5432
+  - Database: mobasher
+  - Username: mobasher
+  - Password: mobasher
+  - SSL: Disabled (local)
+
+- Alembic migrations (from `mobasher/`):
+```bash
+source venv/bin/activate
+alembic revision -m "message" --autogenerate
+alembic upgrade head
+```
+
+- Truncate tables for a fresh start (from repo root):
+```bash
+source mobasher/venv/bin/activate
+python -m mobasher.storage.truncate_db --yes                 # keeps channels
+python -m mobasher.storage.truncate_db --yes --include-channels  # also clears channels
+```
+
+- Environment variables (optional overrides):
+  - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE`
+
+## 4) Docker services (local dev)
+
+- Start Postgres + Redis:
+```bash
+cd mobasher/docker
+docker-compose up -d postgres redis
+```
+- Stop services:
+```bash
+docker-compose down
+```
+
+## 5) Tests
+
+- Install test dependencies (inside venv):
+```bash
+source mobasher/venv/bin/activate
+pip install -r mobasher/requirements.txt
+```
+- Run integration test (Testcontainers) from repo root:
+```bash
+PYTHONPATH=. mobasher/venv/bin/python -m pytest -q mobasher/tests/test_db_integration.py
+```
+
+## 6) General setup
+
+- Create/activate venv and install packages:
+```bash
+cd mobasher
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+- Apply all migrations:
+```bash
+cd mobasher
+source venv/bin/activate
+alembic upgrade head
+```
+
+## 7) Notes
+
+- Recorder writes `recordings` and `segments` to DB by default.
+- `pgvector` and TimescaleDB are used in dev; migrations ensure extensions/policies in the main DB.
+- For quick local tests without Timescale features, use the Testcontainers integration test which bootstraps a temporary Postgres and creates the ORM schema.
