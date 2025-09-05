@@ -32,6 +32,11 @@ pkill -f 'ingestion/recorder.py' || true
 cd mobasher/ingestion && tail -f recorder.log
 ```
 
+- Check status (process running):
+```bash
+pgrep -af 'ingestion/recorder.py' || echo "Recorder not running"
+```
+
 ## 3) Database
 
 - DBeaver connection (local):
