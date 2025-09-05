@@ -13,6 +13,8 @@ import logging
 import yaml
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+import argparse
+import time
 from typing import Optional, Dict, Any, List
 import uuid
 import os
@@ -389,17 +391,53 @@ def load_channel_config(config_path: str) -> Dict[str, Any]:
 
 
 async def main():
-    logging.basicConfig(level=logging.INFO)
-    config = load_channel_config('../channels/kuwait1.yaml')
-    recorder = DualHLSRecorder(config, Path('../data'))
+    parser = argparse.ArgumentParser(description='Mobasher Dual HLS Recorder')
+    parser.add_argument('--config', default='../channels/kuwait1.yaml', help='Path to channel YAML config')
+    parser.add_argument('--data-root', default='../data', help='Path to data root directory')
+    parser.add_argument('--duration', type=int, default=0, help='Run duration in seconds (0 means run continuously)')
+    parser.add_argument('--heartbeat', type=int, default=30, help='Heartbeat log interval in seconds')
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s | %(levelname)s | %(message)s'
+    )
+    logger.info('Starting Mobasher recorder')
+
+    config = load_channel_config(args.config)
+    recorder = DualHLSRecorder(config, Path(args.data_root))
     rec_id = await recorder.start_recording()
-    print(f"Recording started: {rec_id}")
-    await asyncio.sleep(65)
-    await recorder.stop_recording()
-    segs = await recorder.get_new_segments()
-    print(f"Segments found: {len(segs)}")
-    for s in segs[:6]:
-        print(f" - {s['media_type']} {Path(s['path']).name} [{int(s['duration'])}s]")
+    logger.info(f'Recording started | id={rec_id} | channel={recorder.channel_id}')
+
+    start_time = time.time()
+    try:
+        while True:
+            # Heartbeat status
+            try:
+                segs = await recorder.get_new_segments()
+                num_audio = sum(1 for s in segs if s['media_type'] == 'audio')
+                num_video = sum(1 for s in segs if s['media_type'] == 'video')
+                logger.info(
+                    f'heartbeat | audio_segments_today={num_audio} | video_segments_today={num_video}'
+                )
+            except Exception as e:
+                logger.warning(f'heartbeat error: {e}')
+
+            # Duration check
+            if args.duration and (time.time() - start_time) >= args.duration:
+                logger.info('Duration reached, stopping...')
+                break
+
+            await asyncio.sleep(max(5, args.heartbeat))
+    except KeyboardInterrupt:
+        logger.info('Interrupted by user, stopping...')
+    finally:
+        await recorder.stop_recording()
+        # Final summary
+        segs = await recorder.get_new_segments()
+        num_audio = sum(1 for s in segs if s['media_type'] == 'audio')
+        num_video = sum(1 for s in segs if s['media_type'] == 'video')
+        logger.info(f'stopped | audio_segments_today={num_audio} | video_segments_today={num_video}')
 
 
 if __name__ == '__main__':
