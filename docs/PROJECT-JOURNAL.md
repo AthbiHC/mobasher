@@ -98,7 +98,7 @@ This file tracks major decisions, progress, and context for maintaining continui
 ## Technical Notes
 
 ### Stream Access
-- **Kuwait TV URL**: `https://kwtktv1ta.cdn.mangomolo.com/ktv1/smil:ktv1.stream.smil/chunklist.m3u8`
+- **Kuwait News URL**: `https://kwtsplta.cdn.mangomolo.com/kb/smil:kb.stream.smil/chunklist.m3u8`
 - **Required Headers**: Referer + User-Agent for CDN access
 - **Stream Quality**: Multiple bitrates available, auto-selection working
 - **Reliability**: Stable connection with proper reconnection logic
@@ -110,6 +110,9 @@ This file tracks major decisions, progress, and context for maintaining continui
 - **Compression**: 7-day delay for segments, 1-day for metrics
 
 ### Performance Optimizations
+- **Recorder Heartbeat**: periodic logs of audio/video segment counts, with timestamps
+- **Archive**: MP4 with faststart + fragmented moov; 60-minute chunks (playable when segment closes)
+
 - **Audio Processing**: 16kHz mono for ASR efficiency
 - **Segment Size**: 60 seconds balances latency vs. processing overhead
 - **Indexing Strategy**: Time-based with channel filtering
