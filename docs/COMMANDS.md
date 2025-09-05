@@ -61,6 +61,15 @@ python -m mobasher.storage.truncate_db --yes                 # keeps channels
 python -m mobasher.storage.truncate_db --yes --include-channels  # also clears channels
 ```
 
+- Retention cleanup for transcripts/embeddings (non-hypertable):
+```bash
+source mobasher/venv/bin/activate
+# Dry-run first
+python -m mobasher.storage.retention_jobs --dry-run --retain-transcripts-days 365 --retain-embeddings-days 365
+# Apply cleanup
+python -m mobasher.storage.retention_jobs --yes --retain-transcripts-days 365 --retain-embeddings-days 365
+```
+
 - Environment variables (optional overrides):
   - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE`
 
