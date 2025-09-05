@@ -58,7 +58,7 @@ git clone https://github.com/AthbiHC/mobasher.git
 cd mobasher
 
 # Switch to development branch
-git checkout alpha-002
+git checkout alpha-003
 
 # Set up Python environment
 cd mobasher
@@ -73,6 +73,20 @@ docker-compose up -d postgres redis
 # Configure your first channel
 cp channels/kuwait1.yaml channels/my-channel.yaml
 # Edit channels/my-channel.yaml with your stream URL
+```
+
+### Database (Local Dev)
+- Host: `localhost`
+- Port: `5432`
+- Database: `mobasher`
+- Username: `mobasher`
+- Password: `mobasher`
+
+Apply migrations:
+```bash
+cd mobasher
+source venv/bin/activate
+alembic upgrade head
 ```
 
 ## Documentation
@@ -99,8 +113,8 @@ This project uses productivity commands for efficient development:
 
 ## Current Status
 
-🔄 **In Development** - Currently implementing core system architecture
-📋 **Next Milestone** - MVP with single-channel Arabic audio processing
+🔄 **In Development** - DB integration with Alembic migrations and SQLAlchemy models
+📋 **Next Milestone** - Persist segment metadata and ASR ingestion
 
 See [TODO.md](docs/TODO.md) for detailed current priorities.
 

@@ -6,7 +6,7 @@ This file tracks major decisions, progress, and context for maintaining continui
 - **Name**: Mobasher (مباشر - "Live/Direct" in Arabic)
 - **Purpose**: Real-time live TV analysis system for Arabic broadcasts
 - **Repository**: https://github.com/AthbiHC/mobasher
-- **Current Branch**: alpha-002
+- **Current Branch**: alpha-003
 
 ## Architecture Decisions
 
@@ -62,9 +62,9 @@ This file tracks major decisions, progress, and context for maintaining continui
 
 ### Phase 2: Core Pipeline (Current)
 - 🔄 **Database Integration**
-  - SQLAlchemy models for all tables
-  - Database migration system with Alembic
-  - Connection pooling and error handling
+  - SQLAlchemy models defined for all tables
+  - Alembic initialized and baseline migration generated and applied
+  - Connection pooling configured via SQLAlchemy engine
 
 - 🔄 **ASR Pipeline**
   - faster-whisper setup with Arabic models
@@ -85,13 +85,13 @@ This file tracks major decisions, progress, and context for maintaining continui
 - ✅ Documentation framework and productivity commands
 
 ### In Progress
-- 🔄 Database models and migration system
+- 🔄 Database models and migration system (baseline applied)
 - 🔄 ASR pipeline with faster-whisper
 - 🔄 Core workflow integration (recorder → DB → ASR)
 
 ### Next Steps
 - 📋 Complete ASR worker implementation
-- �� Implement processing queue and status tracking
+- 📋 Implement processing queue and status tracking
 - 📋 Create basic monitoring dashboard
 - 📋 Add comprehensive error handling and logging
 
@@ -117,6 +117,14 @@ This file tracks major decisions, progress, and context for maintaining continui
 - **Segment Size**: 60 seconds balances latency vs. processing overhead
 - **Indexing Strategy**: Time-based with channel filtering
 - **Vector Search**: pgvector with planned IVFFlat indexing
+
+### DBeaver Connection (Local Dev)
+- Host: `localhost`
+- Port: `5432`
+- Database: `mobasher`
+- Username: `mobasher`
+- Password: `mobasher`
+- Driver: PostgreSQL (TimescaleDB/pgvector extensions available)
 
 ## Development Workflow
 
