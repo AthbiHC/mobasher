@@ -1,9 +1,9 @@
-id: kuwait1
-name: Kuwait TV 1
-description: Official Kuwait Television Channel 1
+id: kuwait_news
+name: Kuwait News Channel
+description: Kuwait News Channel (Majlis) live stream
 
 input:
-  url: "https://kwtktv1ta.cdn.mangomolo.com/ktv1/smil:ktv1.stream.smil/chunklist.m3u8"
+  url: "https://kwtsplta.cdn.mangomolo.com/kb/smil:kb.stream.smil/chunklist.m3u8"
   headers:
     Referer: "https://www.elahmad.com/"
     User-Agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
