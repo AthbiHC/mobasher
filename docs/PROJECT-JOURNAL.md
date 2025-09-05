@@ -65,6 +65,8 @@ This file tracks major decisions, progress, and context for maintaining continui
   - SQLAlchemy models defined for all tables
   - Alembic initialized and baseline migration generated and applied
   - Connection pooling configured via SQLAlchemy engine
+  - Recorder now persists `recordings` start/end and `segments` per file
+  - Added migration `b6aa81e4e7b3` to allow nullable audio/video paths and require at least one
 
 - 🔄 **ASR Pipeline**
   - faster-whisper setup with Arabic models
@@ -112,6 +114,11 @@ This file tracks major decisions, progress, and context for maintaining continui
 ### Performance Optimizations
 - **Recorder Heartbeat**: periodic logs of audio/video segment counts, with timestamps
 - **Archive**: MP4 with faststart + fragmented moov; 60-minute chunks (playable when segment closes)
+
+### Persistence Behavior
+- Inserts `Channel` on first use (upsert) to satisfy FK for `Recordings`
+- `Segments` are upserted per time slice; `audio_path`/`video_path` are nullable but at least one must exist
+- Only segments within the active run window are persisted
 
 - **Audio Processing**: 16kHz mono for ASR efficiency
 - **Segment Size**: 60 seconds balances latency vs. processing overhead

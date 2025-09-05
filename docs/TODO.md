@@ -27,7 +27,9 @@ Current priorities and tasks for the Mobasher live TV analysis system.
 - [x] Create SQLAlchemy models for all tables
 - [x] Implement database migration system with Alembic (baseline applied)
 - [x] Add database connection pooling
+- [x] Persist recording and segment metadata from recorder
 - [ ] Create database initialization scripts
+- [ ] Add repository functions for channels/recordings/segments
 
 ### ASR (Speech Recognition)
 - [ ] Set up faster-whisper with Arabic language model
@@ -126,6 +128,6 @@ We've successfully implemented the foundation:
 
 ---
 
-**Last Updated**: 2025-09-05
+**Last Updated**: 2025-09-05 (post DB persistence)
 **Current Branch**: alpha-003
 **Next Milestone**: ASR pipeline integration with database

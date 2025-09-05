@@ -113,8 +113,8 @@ This project uses productivity commands for efficient development:
 
 ## Current Status
 
-🔄 **In Development** - DB integration with Alembic migrations and SQLAlchemy models
-📋 **Next Milestone** - Persist segment metadata and ASR ingestion
+🔄 **In Development** - DB integration (recorder now writes `recordings` and `segments`)
+📋 **Next Milestone** - Repository layer + ASR ingestion
 
 See [TODO.md](docs/TODO.md) for detailed current priorities.
 
