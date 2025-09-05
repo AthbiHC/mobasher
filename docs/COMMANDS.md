@@ -19,7 +19,9 @@ Note: These are workflow shortcuts we use with the assistant. Their effects are 
 ```bash
 cd mobasher/ingestion
 source ../venv/bin/activate
-nohup python recorder.py --config ../channels/kuwait1.yaml --data-root ../data --heartbeat 15 > recorder.log 2>&1 &
+# Optional: set data location on external disk
+export MOBASHER_DATA_ROOT=/Volumes/ExternalDB/Media-View-Data/data/
+nohup python recorder.py --config ../channels/kuwait1.yaml --data-root ${MOBASHER_DATA_ROOT:-../data} --heartbeat 15 > recorder.log 2>&1 &
 ```
 - Stop recorder:
 ```bash

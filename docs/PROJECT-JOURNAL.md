@@ -115,6 +115,9 @@ This file tracks major decisions, progress, and context for maintaining continui
 - **Recorder Heartbeat**: periodic logs of audio/video segment counts, with timestamps
 - **Archive**: MP4 with faststart + fragmented moov; 60-minute chunks (playable when segment closes)
 
+### Storage Path
+- Data root can be overridden via `MOBASHER_DATA_ROOT`. Example external path: `/Volumes/ExternalDB/Media-View-Data/data/`.
+
 ### Persistence Behavior
 - Inserts `Channel` on first use (upsert) to satisfy FK for `Recordings`
 - `Segments` are upserted per time slice; `audio_path`/`video_path` are nullable but at least one must exist

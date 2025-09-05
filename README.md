@@ -75,6 +75,13 @@ cp channels/kuwait1.yaml channels/my-channel.yaml
 # Edit channels/my-channel.yaml with your stream URL
 ```
 
+### Data location (external disk optional)
+Set a custom data root via environment variable. Example for an external drive:
+```bash
+export MOBASHER_DATA_ROOT=/Volumes/ExternalDB/Media-View-Data/data/
+```
+If not set, the recorder defaults to `../data` relative to `mobasher/ingestion`.
+
 ### Database (Local Dev)
 - Host: `localhost`
 - Port: `5432`
@@ -100,7 +107,9 @@ alembic upgrade head
 ```bash
 cd mobasher/ingestion
 source ../venv/bin/activate
-nohup python recorder.py > recorder.log 2>&1 &
+# Optional: set custom data root
+# export MOBASHER_DATA_ROOT=/Volumes/ExternalDB/Media-View-Data/data/
+nohup python recorder.py --config ../channels/kuwait1.yaml --heartbeat 15 > recorder.log 2>&1 &
 # tail -f recorder.log
 ```
 
