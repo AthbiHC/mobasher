@@ -113,6 +113,22 @@ nohup python recorder.py --config ../channels/kuwait1.yaml --heartbeat 15 > reco
 # tail -f recorder.log
 ```
 
+### Recorder status and stop
+```bash
+# Check if recorder process is running
+pgrep -af 'ingestion/recorder.py' || echo "Recorder not running"
+
+# Stop recorder
+pkill -f 'ingestion/recorder.py' || true
+```
+
+### Truncate database tables (fresh start)
+```bash
+source mobasher/venv/bin/activate
+python -m mobasher.storage.truncate_db --yes                 # keeps channels
+python -m mobasher.storage.truncate_db --yes --include-channels  # also clears channels
+```
+
 
 This project uses productivity commands for efficient development:
 - Context is maintained across sessions through structured documentation
