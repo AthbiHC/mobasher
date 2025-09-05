@@ -21,6 +21,7 @@ from .models import (
     Recording,
     Segment,
     Transcript,
+    SegmentEmbedding,
 )
 
 
@@ -260,4 +261,61 @@ def list_recent_transcripts(
             results.append((seg, tr))
     return results
 
+
+# -------------------- Embeddings (pgvector) --------------------
+
+def upsert_embedding(
+    db: Session,
+    *,
+    segment_id: UUID,
+    segment_started_at: datetime,
+    model_name: str,
+    vector: Optional[list[float]],
+) -> SegmentEmbedding:
+    emb = db.get(SegmentEmbedding, (segment_id, segment_started_at))
+    if emb is None:
+        emb = SegmentEmbedding(
+            segment_id=segment_id,
+            segment_started_at=segment_started_at,
+            model_name=model_name,
+            vector=vector,
+        )
+        db.add(emb)
+    else:
+        emb.model_name = model_name
+        emb.vector = vector
+        db.add(emb)
+    db.commit()
+    db.refresh(emb)
+    return emb
+
+
+def semantic_search_segments_by_vector(
+    db: Session,
+    *,
+    query_vector: list[float],
+    top_k: int = 5,
+    model_name: Optional[str] = None,
+    channel_id: Optional[str] = None,
+) -> List[Tuple[Segment, float]]:
+    """Return top-k segments most similar to the query vector (L2 distance).
+
+    Filters by embedding model and/or channel when provided.
+    """
+    # Build distance expression using pgvector comparator
+    distance = SegmentEmbedding.vector.l2_distance(query_vector)  # type: ignore[attr-defined]
+
+    stmt: Select = select(Segment, distance.label("distance")).where(
+        SegmentEmbedding.segment_id == Segment.id,
+        SegmentEmbedding.segment_started_at == Segment.started_at,
+    )
+    if model_name:
+        stmt = stmt.where(SegmentEmbedding.model_name == model_name)
+    if channel_id:
+        stmt = stmt.where(Segment.channel_id == channel_id)
+    stmt = stmt.order_by(distance.asc()).limit(top_k)
+
+    rows = list(db.execute(stmt).all())
+    # rows are tuples: (Segment, distance)
+    return [(row[0], float(row[1])) for row in rows]
 
