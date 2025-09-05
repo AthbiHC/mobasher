@@ -1,0 +1,90 @@
+"""
+Database engine and session management for Mobasher.
+
+Provides:
+- Pydantic settings-driven DATABASE_URL
+- SQLAlchemy engine with sensible pooling
+- Session factory and context helper
+"""
+
+from __future__ import annotations
+
+from typing import Generator, Optional
+
+from pydantic_settings import BaseSettings
+from pydantic import Field
+from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import sessionmaker, Session
+
+
+class DBSettings(BaseSettings):
+    db_host: str = Field(default="localhost", alias="DB_HOST")
+    db_port: int = Field(default=5432, alias="DB_PORT")
+    db_name: str = Field(default="mobasher", alias="DB_NAME")
+    db_user: str = Field(default="mobasher", alias="DB_USER")
+    db_password: str = Field(default="mobasher", alias="DB_PASSWORD")
+    db_sslmode: Optional[str] = Field(default=None, alias="DB_SSLMODE")  # e.g., require/disable
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
+
+    def database_url(self) -> str:
+        # Build a PostgreSQL URL compatible with psycopg
+        base = f"postgresql+psycopg://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
+        if self.db_sslmode:
+            return f"{base}?sslmode={self.db_sslmode}"
+        return base
+
+
+_engine: Optional[Engine] = None
+SessionLocal: Optional[sessionmaker[Session]] = None
+
+
+def init_engine(settings: Optional[DBSettings] = None) -> Engine:
+    """Initialize and return a global SQLAlchemy engine."""
+    global _engine, SessionLocal
+    if settings is None:
+        settings = DBSettings()
+    if _engine is None:
+        _engine = create_engine(
+            settings.database_url(),
+            pool_pre_ping=True,
+            pool_size=5,
+            max_overflow=10,
+            future=True,
+        )
+        SessionLocal = sessionmaker(
+            bind=_engine, autoflush=False, autocommit=False, expire_on_commit=False, class_=Session
+        )
+    return _engine
+
+
+def get_session() -> Generator[Session, None, None]:
+    """Context-yielding DB session for scripts and web contexts.
+
+    Usage:
+        with contextlib.closing(next(get_session())) as db:
+            ...
+    or FastAPI dependency injection pattern can wrap this generator.
+    """
+    global SessionLocal
+    if SessionLocal is None:
+        init_engine()
+    assert SessionLocal is not None
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def create_all_tables() -> None:
+    """Create tables from SQLAlchemy models (useful in early dev; prefer Alembic later)."""
+    from .models import Base  # local import to avoid circulars
+
+    eng = init_engine()
+    Base.metadata.create_all(bind=eng)
+
+

@@ -14,10 +14,18 @@ import yaml
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 import argparse
+from contextlib import contextmanager
 import time
 from typing import Optional, Dict, Any, List
 import uuid
 import os
+import sys
+from pathlib import Path as _Path
+
+# Ensure project root is on sys.path when running from within the package directory
+_project_root = str(_Path(__file__).resolve().parents[2])
+if _project_root not in sys.path:
+    sys.path.append(_project_root)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +45,12 @@ class DualHLSRecorder:
         self._create_directories()
         # Track run start to aid in test cleanup of extra full segments
         self.run_started_at: Optional[datetime] = None
+        # Initialize DB engine early so first write is fast
+        try:
+            from mobasher.storage.db import init_engine
+            init_engine()
+        except Exception as e:
+            logger.warning(f"DB init warning: {e}")
 
         
 
@@ -177,6 +191,11 @@ class DualHLSRecorder:
         self.recording_id = str(uuid.uuid4())
         self.run_started_at = datetime.now(timezone.utc)
         self._create_directories()
+        # Persist recording start
+        try:
+            self._persist_recording_start()
+        except Exception as e:
+            logger.warning(f"failed to persist recording start: {e}")
         # Launch separate audio/video recorders for robustness
         if self.audio_enabled:
             audio_cmd = self._build_audio_command()
@@ -207,6 +226,11 @@ class DualHLSRecorder:
         await self._cleanup_partials()
         # Remove extra full segments created during short validations (keep earliest in this run window)
         await self._cleanup_extras()
+        # Persist recording end
+        try:
+            self._persist_recording_end()
+        except Exception as e:
+            logger.warning(f"failed to persist recording end: {e}")
 
     async def _stop_process(self, process: Optional[asyncio.subprocess.Process]):
         if not process:
@@ -254,6 +278,11 @@ class DualHLSRecorder:
                 continue
             info = self._parse_start_only(fp.name)
             if info:
+                # Persist/update segment row for this time slice
+                try:
+                    self._persist_segment(info, media_type, fp, size)
+                except Exception as e:
+                    logger.warning(f"persist segment failed: {fp.name} | {e}")
                 out.append({
                     'path': str(fp),
                     'channel_id': self.channel_id,
@@ -382,6 +411,103 @@ class DualHLSRecorder:
                             fp.unlink(missing_ok=True)
                     except FileNotFoundError:
                         pass
+
+    # -------------------- DB Persistence --------------------
+    @contextmanager
+    def _db_session(self):
+        from mobasher.storage.db import get_session
+        gen = get_session()
+        session = next(gen)
+        try:
+            yield session
+        finally:
+            try:
+                next(gen)
+            except StopIteration:
+                pass
+
+    def _persist_recording_start(self) -> None:
+        if not self.recording_id or not self.run_started_at:
+            return
+        from mobasher.storage.models import Recording, Channel
+        with self._db_session() as session:
+            # Ensure channel exists to satisfy FK on recordings.channel_id
+            try:
+                ch = session.get(Channel, self.channel_id)
+                if ch is None:
+                    input_cfg = self.config.get('input', {})
+                    ch = Channel(
+                        id=self.channel_id,
+                        name=self.config.get('name', self.channel_id),
+                        description=self.config.get('description'),
+                        url=input_cfg.get('url', ''),
+                        headers=input_cfg.get('headers', {}),
+                        active=True,
+                    )
+                    session.add(ch)
+                    session.flush()
+            except Exception as e:
+                logger.warning(f"channel ensure failed: {e}")
+            rec = Recording(
+                id=uuid.UUID(self.recording_id),
+                channel_id=self.channel_id,
+                started_at=self.run_started_at,
+                status='running',
+            )
+            session.merge(rec)
+            session.commit()
+
+    def _persist_recording_end(self) -> None:
+        if not self.recording_id or not self.run_started_at:
+            return
+        from mobasher.storage.models import Recording
+        with self._db_session() as session:
+            pk = (uuid.UUID(self.recording_id), self.run_started_at)
+            rec = session.get(Recording, pk)
+            if rec is not None:
+                rec.ended_at = datetime.now(timezone.utc)
+                rec.status = 'completed'
+                session.add(rec)
+                session.commit()
+
+    def _segment_uuid(self, started_at: datetime) -> uuid.UUID:
+        name = f"{self.channel_id}:{started_at.isoformat()}"
+        return uuid.uuid5(uuid.NAMESPACE_DNS, name)
+
+    def _persist_segment(self, info: Dict[str, Any], media_type: str, file_path: Path, size: int) -> None:
+        if not self.recording_id or not self.run_started_at:
+            return
+        # persist only segments within this run window (avoid older files in today's folder)
+        if info['started_at'] < self.run_started_at:
+            return
+        from mobasher.storage.models import Segment
+        seg_id = self._segment_uuid(info['started_at'])
+        with self._db_session() as session:
+            existing = session.get(Segment, (seg_id, info['started_at']))
+            if existing is None:
+                seg = Segment(
+                    id=seg_id,
+                    recording_id=uuid.UUID(self.recording_id) if self.recording_id else None,
+                    channel_id=self.channel_id,
+                    started_at=info['started_at'],
+                    ended_at=info['ended_at'],
+                    audio_path=str(file_path) if media_type == 'audio' else None,
+                    video_path=str(file_path) if media_type == 'video' else None,
+                    file_size_bytes=size,
+                    status='completed',
+                )
+                session.add(seg)
+            else:
+                if media_type == 'audio' and not existing.audio_path:
+                    existing.audio_path = str(file_path)
+                if media_type == 'video' and not existing.video_path:
+                    existing.video_path = str(file_path)
+                if not existing.file_size_bytes or size > (existing.file_size_bytes or 0):
+                    existing.file_size_bytes = size
+                existing.ended_at = info['ended_at']
+                existing.status = 'completed'
+                session.add(existing)
+            session.commit()
 
 
 def load_channel_config(config_path: str) -> Dict[str, Any]:
