@@ -58,7 +58,7 @@ git clone https://github.com/AthbiHC/mobasher.git
 cd mobasher
 
 # Switch to development branch
-git checkout alpha-001
+git checkout alpha-002
 
 # Set up Python environment
 cd mobasher
@@ -82,6 +82,14 @@ cp channels/kuwait1.yaml channels/my-channel.yaml
 - **[TODO List](docs/TODO.md)** - Current priorities and development roadmap
 
 ## Development Workflow
+### Run recorder in background (local)
+```bash
+cd mobasher/ingestion
+source ../venv/bin/activate
+nohup python recorder.py > recorder.log 2>&1 &
+# tail -f recorder.log
+```
+
 
 This project uses productivity commands for efficient development:
 - Context is maintained across sessions through structured documentation

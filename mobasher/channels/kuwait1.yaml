@@ -10,14 +10,45 @@ input:
   
 recording:
   segment_seconds: 60
-  archive_mkv: false
+  archive_mkv: false              # Use MP4 format
+  video_enabled: true             # Enable video recording
+  audio_enabled: true             # Enable audio recording
+  video_quality: "720p"           # Configurable quality
+  video_codec: "libx264"          # H.264 codec
+  video_preset: "medium"          # Encoding speed vs quality balance
+  
+  # Archive recorder settings (1-hour segments for viewing)
+  archive_enabled: true
+  archive_segment_seconds: 3600   # 1 hour segments
+  archive_quality: "1080p"        # Higher quality for viewing
+  archive_codec: "libx264"
+  archive_preset: "slow"          # Better quality for archive
+  
+  # Reconnection settings
   reconnect_attempts: 5
   reconnect_delay_max: 10
 
 audio:
   sample_rate: 16000
   channels: 1
-  format: "pcm_s16le"
+  format: "pcm_s16le"             # For ASR processing
+  bitrate: "128k"                 # For archive quality
+
+video:
+  # Quality presets
+  qualities:
+    "720p":
+      resolution: "1280x720"
+      bitrate: "2500k"
+      fps: 25
+    "1080p":
+      resolution: "1920x1080" 
+      bitrate: "4500k"
+      fps: 25
+    "original":
+      resolution: "copy"
+      bitrate: "copy"
+      fps: "copy"
 
 asr:
   model: "large-v3"
@@ -53,8 +84,15 @@ analysis:
   
 storage:
   media_root: "data/"
+  date_folders: true              # Enable YYYY-MM-DD folder structure
   retention_days: 30
   compression_enabled: true
+  
+  # Directory structure
+  directories:
+    audio: "audio"                # data/audio/YYYY-MM-DD/
+    video: "video"                # data/video/YYYY-MM-DD/
+    archive: "archive"            # data/archive/YYYY-MM-DD/
 
 monitoring:
   metrics_enabled: true
