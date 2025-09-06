@@ -12,6 +12,15 @@ This document catalogs common commands and workflows for developing, running, an
   - ASR worker: `./scripts/mediaview asr worker` (requires Redis)
   - ASR ping: `./scripts/mediaview asr ping`
   - ASR enqueue: `./scripts/mediaview asr enqueue --channel-id kuwait_news --since 2025-09-05T00:00:00Z --limit 50`
+  - ASR scheduler: `./scripts/mediaview asr scheduler --interval 30 --lookback 10`
+  - ASR bench (compare models):
+```bash
+./scripts/mediaview asr bench \
+  --path '/path/to/file1.wav' \
+  --path2 '/path/to/file2.wav' \
+  --path3 '/path/to/file3.wav' \
+  --models 'small,medium' --beam 5 --no-vad --no-word-ts --device cpu
+```
   - Truncate DB: `./scripts/mediaview db truncate --yes`
   - Retention: `./scripts/mediaview db retention --dry-run`
 

@@ -27,3 +27,13 @@ This document tracks noteworthy changes, fixes, and operational learnings. Keep 
 - ASR tasks: `asr.ping`, `asr.transcribe_segment` (faster-whisper integration)
 - Enqueue helper: `mobasher/asr/enqueue.py` with `enqueue_missing()`
 - CLI: `mediaview asr worker|ping|enqueue`
+  
+## 2025-09-06T00:00:03Z
+- ASR scheduler: polling service to enqueue recent missing transcripts
+- CLI: `mediaview asr scheduler --interval 30 --lookback 10`
+- Optimization: cache Whisper model in worker process for speed
+
+## 2025-09-06T00:00:04Z
+- Added ASR benchmark tool (`mediaview asr bench`) to compare models/params
+- API: `/transcripts` endpoint with filters; docs added in `docs/API.md`
+- Guidance: better accuracy observed with `ASR_MODEL=medium`, `beam=5`, `VAD=off`
