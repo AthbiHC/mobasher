@@ -32,6 +32,12 @@ class VisionSettings(BaseSettings):
     yolo_model: str = "yolov8n.pt"  # ultralytics model id or path
     objects_conf_threshold: float = 0.35
     objects_classes: Optional[List[str]] = None  # e.g., ["person", "car"]
+    # Faces
+    faces_fps: float = 1.0
+    faces_det_thresh: float = 0.4
+    faces_rec_thresh: float = 0.35
+    faces_model: str = "buffalo_l"  # insightface model pack
+    faces_gallery_dir: Optional[str] = None  # e.g., "/path/to/gallery/<identity>/*.jpg"
 
 
 settings = VisionSettings()
@@ -53,6 +59,8 @@ def _sample_timestamps(duration_s: float, fps: float) -> List[float]:
 # Global OCR model cache
 _OCR = None
 _YOLO = None
+_FACE = None
+_GALLERY = None  # list of (identity, embedding)
 
 
 def _get_ocr():
@@ -73,6 +81,51 @@ def _get_yolo():
         return _YOLO
     except Exception:
         return None
+
+
+def _get_face_analyzer():
+    global _FACE
+    if _FACE is not None:
+        return _FACE
+    try:
+        # Lazy import; CPU provider
+        from insightface.app import FaceAnalysis  # type: ignore
+        fa = FaceAnalysis(name=settings.faces_model, providers=['CPUExecutionProvider'])
+        fa.prepare(ctx_id=0, det_thresh=settings.faces_det_thresh)
+        _FACE = fa
+        return _FACE
+    except Exception:
+        return None
+
+
+def _load_face_gallery() -> Optional[List[Tuple[str, Any]]]:
+    global _GALLERY
+    if _GALLERY is not None:
+        return _GALLERY
+    fa = _get_face_analyzer()
+    if fa is None or not settings.faces_gallery_dir:
+        _GALLERY = []
+        return _GALLERY
+    import os
+    import cv2  # type: ignore
+    gallery: List[Tuple[str, Any]] = []
+    for root, _, files in os.walk(settings.faces_gallery_dir):
+        ident = os.path.basename(root)
+        for f in files:
+            if not f.lower().endswith((".jpg",".jpeg",".png")):
+                continue
+            path = os.path.join(root, f)
+            img = cv2.imread(path)
+            if img is None:
+                continue
+            faces = fa.get(img)
+            if not faces:
+                continue
+            # take first face embedding
+            emb = faces[0].normed_embedding
+            gallery.append((ident, emb))
+    _GALLERY = gallery
+    return _GALLERY
 
 
 def _read_frame_at(video_path: str, ts_sec: float) -> Optional[Tuple[Any, int, int]]:
@@ -183,7 +236,7 @@ def ocr_segment(self, segment_id: str, segment_started_at_iso: str) -> Dict[str,
                 pre = _preprocess_for_ocr(sub)
                 # EasyOCR returns list of [bbox, text, conf]
                 # Use slightly more permissive thresholds for overlays
-                results = ocr.readtext(pre, paragraph=True, detail=1, text_threshold=0.5, low_text=0.3)
+                results = ocr.readtext(pre, paragraph=False, detail=1, text_threshold=0.5, low_text=0.3)
                 # Save one region screenshot per frame with descriptive name
                 fname = os.path.basename(seg.video_path)
                 base, _ = os.path.splitext(fname)
@@ -331,6 +384,9 @@ def ocr_segment(self, segment_id: str, segment_started_at_iso: str) -> Dict[str,
 
         # Write canonical span events
         for sp in spans:
+            # aggregate confidence over tokens if available
+            conf_values = [t.get("conf") for t in sp["tokens"] if isinstance(t.get("conf"), (int, float))]
+            avg_conf = float(sum(conf_values) / len(conf_values)) if conf_values else None
             ve_span = VisualEvent(
                 id=None,
                 segment_id=UUID(segment_id),
@@ -339,7 +395,7 @@ def ocr_segment(self, segment_id: str, segment_started_at_iso: str) -> Dict[str,
                 timestamp_offset=float(sp["start"]),
                 event_type='ocr',
                 bbox=[int(v) for v in sp["bbox"]],
-                confidence=None,
+                confidence=avg_conf,
                 data={
                     "text": sp["text"],
                     "lang": "ar",
@@ -448,5 +504,93 @@ def objects_segment(self, segment_id: str, segment_started_at_iso: str) -> Dict[
                 )
                 db.add(ve)
                 events += 1
+        db.commit()
+    return {"ok": True, "events": events, "elapsed_ms": int((perf_counter() - start) * 1000)}
+
+
+@app.task(name="vision.faces_segment", bind=True, max_retries=2, default_retry_delay=10)
+def faces_segment(self, segment_id: str, segment_started_at_iso: str) -> Dict[str, Any]:
+    start = perf_counter()
+    from datetime import datetime
+    from uuid import UUID
+    from mobasher.storage.db import get_session, init_engine
+    from mobasher.storage.models import Segment, VisualEvent
+    import subprocess
+    import os
+    import numpy as np  # type: ignore
+
+    init_engine()
+    with next(get_session()) as db:  # type: ignore
+        seg = db.get(Segment, (UUID(segment_id), datetime.fromisoformat(segment_started_at_iso)))
+        if seg is None or not seg.video_path:
+            raise self.retry(exc=RuntimeError("segment_missing_or_no_video"))
+
+        # Duration
+        try:
+            result = subprocess.run([
+                'ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nokey=1:noprint_wrappers=1', seg.video_path
+            ], capture_output=True, text=True)
+            duration_s = float(result.stdout.strip()) if result.returncode == 0 else 60.0
+        except Exception:
+            duration_s = 60.0
+
+        timestamps = _sample_timestamps(duration_s, settings.faces_fps)
+        fa = _get_face_analyzer()
+        gallery = _load_face_gallery() or []
+        events = 0
+        screenshot_root = os.environ.get('MOBASHER_SCREENSHOT_ROOT', '/Volumes/ExternalDB/Media-View-Data/data/screenshot')
+        os.makedirs(screenshot_root, exist_ok=True)
+
+        def cosine(a, b):
+            a = np.asarray(a); b = np.asarray(b)
+            denom = (np.linalg.norm(a) * np.linalg.norm(b))
+            return float(np.dot(a, b) / denom) if denom > 0 else 0.0
+
+        for idx, ts in enumerate(timestamps):
+            fr = _read_frame_at(seg.video_path, ts)
+            if fr is None:
+                continue
+            frame, w, h = fr
+            fname = os.path.basename(seg.video_path)
+            base, _ = os.path.splitext(fname)
+            shot_name = f"{base}-seg_{idx}_faces.jpg"
+            shot_path = os.path.join(screenshot_root, shot_name)
+            try:
+                import cv2
+                cv2.imwrite(shot_path, frame)
+            except Exception:
+                pass
+
+            if fa is None:
+                continue
+            faces = fa.get(frame)
+            for f in faces:
+                x1, y1, x2, y2 = map(int, f.bbox.astype(int))
+                emb = f.normed_embedding
+                best_ident = None
+                best_score = -1.0
+                for ident, gemb in gallery:
+                    s = cosine(emb, gemb)
+                    if s > best_score:
+                        best_score = s
+                        best_ident = ident
+                if best_score >= settings.faces_rec_thresh:
+                    ve = VisualEvent(
+                        id=None,
+                        segment_id=UUID(segment_id),
+                        segment_started_at=datetime.fromisoformat(segment_started_at_iso),
+                        channel_id=seg.channel_id,
+                        timestamp_offset=float(ts),
+                        event_type='face',
+                        bbox=[x1, y1, max(1, x2-x1), max(1, y2-y1)],
+                        confidence=float(best_score),
+                        data={'identity': best_ident},
+                        video_path=seg.video_path,
+                        video_filename=fname,
+                        screenshot_path=shot_path,
+                        frame_timestamp_ms=int(ts*1000),
+                    )
+                    db.add(ve)
+                    events += 1
         db.commit()
     return {"ok": True, "events": events, "elapsed_ms": int((perf_counter() - start) * 1000)}

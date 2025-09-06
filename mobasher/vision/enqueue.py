@@ -5,7 +5,7 @@ from typing import Optional
 
 from mobasher.storage.db import get_session, init_engine
 from mobasher.storage.models import Segment, Transcript
-from mobasher.vision.worker import ocr_segment, objects_segment
+from mobasher.vision.worker import ocr_segment, objects_segment, faces_segment
 
 
 def enqueue_vision_for_asr_processed(limit: int = 20) -> int:
@@ -30,6 +30,7 @@ def enqueue_vision_for_asr_processed(limit: int = 20) -> int:
                 continue
             ocr_segment.delay(str(seg.id), seg.started_at.isoformat())
             objects_segment.delay(str(seg.id), seg.started_at.isoformat())
+            faces_segment.delay(str(seg.id), seg.started_at.isoformat())
             count += 1
             if count >= limit:
                 break
