@@ -21,3 +21,9 @@ This document tracks noteworthy changes, fixes, and operational learnings. Keep 
 - Error handling: unified JSON 500 handler
 - CLI: `mediaview api serve` defaults to 127.0.0.1; add `--public` flag
 - Docs: added `docs/API.md` and updated references in README/COMMANDS
+
+## 2025-09-06T00:00:02Z
+- Phase 2 scaffold: Celery worker (`mobasher/asr/worker.py`) with Redis broker
+- ASR tasks: `asr.ping`, `asr.transcribe_segment` (faster-whisper integration)
+- Enqueue helper: `mobasher/asr/enqueue.py` with `enqueue_missing()`
+- CLI: `mediaview asr worker|ping|enqueue`

@@ -9,6 +9,9 @@ This document catalogs common commands and workflows for developing, running, an
   - Start recorder: `./scripts/mediaview recorder start --config mobasher/channels/kuwait1.yaml`
   - Status/Stop: `./scripts/mediaview recorder status` / `./scripts/mediaview recorder stop` (also cleans up lingering ffmpeg)
   - API server: `./scripts/mediaview api serve --host 127.0.0.1 --port 8001` (add `--public` to bind 0.0.0.0)
+  - ASR worker: `./scripts/mediaview asr worker` (requires Redis)
+  - ASR ping: `./scripts/mediaview asr ping`
+  - ASR enqueue: `./scripts/mediaview asr enqueue --channel-id kuwait_news --since 2025-09-05T00:00:00Z --limit 50`
   - Truncate DB: `./scripts/mediaview db truncate --yes`
   - Retention: `./scripts/mediaview db retention --dry-run`
 
