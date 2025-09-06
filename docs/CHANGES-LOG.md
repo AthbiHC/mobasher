@@ -34,6 +34,5 @@ This document tracks noteworthy changes, fixes, and operational learnings. Keep 
 - Optimization: cache Whisper model in worker process for speed
 
 ## 2025-09-06T00:00:04Z
-- Added ASR benchmark tool (`mediaview asr bench`) to compare models/params
-- API: `/transcripts` endpoint with filters; docs added in `docs/API.md`
-- Guidance: better accuracy observed with `ASR_MODEL=medium`, `beam=5`, `VAD=off`
+- Enqueue dedupe via Redis keys with TTL to avoid duplicate scheduling
+- Scheduler exponential backoff with jitter and success reset
