@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Iterable, List, Optional, Tuple
 from uuid import UUID, uuid4
 
-from sqlalchemy import Select, and_, desc, func, select
+from sqlalchemy import Select, and_, desc, func, select, exists
 from sqlalchemy.orm import Session
 
 from .models import (
@@ -253,6 +253,7 @@ def list_recent_transcripts(
     channel_id: Optional[str] = None,
     since: Optional[datetime] = None,
     limit: int = 100,
+    offset: int = 0,
 ) -> List[Tuple[Segment, Transcript]]:
     # Join on composite keys via manual where conditions
     seg_stmt = select(Segment)
@@ -260,7 +261,7 @@ def list_recent_transcripts(
         seg_stmt = seg_stmt.where(Segment.channel_id == channel_id)
     if since:
         seg_stmt = seg_stmt.where(Segment.started_at >= since)
-    seg_stmt = seg_stmt.order_by(desc(Segment.started_at)).limit(limit)
+    seg_stmt = seg_stmt.order_by(desc(Segment.started_at)).offset(offset).limit(limit)
     segments = list(db.execute(seg_stmt).scalars().all())
     results: List[Tuple[Segment, Transcript]] = []
     for seg in segments:
@@ -326,4 +327,38 @@ def semantic_search_segments_by_vector(
     rows = list(db.execute(stmt).all())
     # rows are tuples: (Segment, distance)
     return [(row[0], float(row[1])) for row in rows]
+
+
+# -------------------- Helpers for ASR pipeline --------------------
+
+def list_segments_missing_transcripts(
+    db: Session,
+    *,
+    channel_id: Optional[str] = None,
+    since: Optional[datetime] = None,
+    limit: int = 200,
+) -> List[Segment]:
+    """List recent completed segments that have audio and no transcript yet.
+
+    Results ordered by newest first.
+    """
+    tr_exists = (
+        select(Transcript.segment_id)
+        .where(
+            Transcript.segment_id == Segment.id,
+            Transcript.segment_started_at == Segment.started_at,
+        )
+        .limit(1)
+    )
+    stmt: Select = select(Segment).where(
+        Segment.audio_path.is_not(None),
+        Segment.status == "completed",
+        ~exists(tr_exists),
+    )
+    if channel_id:
+        stmt = stmt.where(Segment.channel_id == channel_id)
+    if since:
+        stmt = stmt.where(Segment.started_at >= since)
+    stmt = stmt.order_by(desc(Segment.started_at)).limit(limit)
+    return list(db.execute(stmt).scalars().all())
 

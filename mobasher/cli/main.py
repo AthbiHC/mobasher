@@ -177,6 +177,64 @@ def main() -> None:
     app()
 
 
+asr_app = typer.Typer(help="ASR pipeline")
+app.add_typer(asr_app, name="asr")
+
+
+@asr_app.command("worker")
+def asr_worker() -> None:
+    code = _run("celery -A mobasher.asr.worker.app worker --loglevel=INFO", cwd=_repo_root())
+    raise typer.Exit(code)
+
+
+@asr_app.command("ping")
+def asr_ping() -> None:
+    code = _run("python -c 'from mobasher.asr.worker import ping; print(ping.delay().get(timeout=5))' | cat", cwd=_repo_root())
+    raise typer.Exit(code)
+
+
+@asr_app.command("enqueue")
+def asr_enqueue(
+    channel_id: Optional[str] = typer.Option(None, help="Filter by channel id"),
+    since: Optional[str] = typer.Option(None, help="ISO timestamp to start from (UTC)"),
+    limit: int = typer.Option(200, help="Max segments to enqueue"),
+) -> None:
+    ts = f" --since {since}" if since else ""
+    ch = f" --channel-id {channel_id}" if channel_id else ""
+    code = _run(f"python -c 'from mobasher.asr.enqueue import enqueue_missing; print(enqueue_missing({repr(channel_id)}, __import__(\"datetime\").datetime.fromisoformat(\"{since}\") if {repr(bool(since))} else None, {limit}))' | cat", cwd=_repo_root())
+    raise typer.Exit(code)
+
+
+@asr_app.command("scheduler")
+def asr_scheduler(
+    channel_id: Optional[str] = typer.Option(None, help="Filter by channel id"),
+    interval: int = typer.Option(30, help="Polling interval seconds"),
+    lookback: int = typer.Option(10, help="Lookback minutes"),
+) -> None:
+    code = _run(f"python -c 'from mobasher.asr.scheduler import run_scheduler_blocking; run_scheduler_blocking(channel_id={repr(channel_id)}, interval_seconds={interval}, lookback_minutes={lookback})'", cwd=_repo_root())
+    raise typer.Exit(code)
+
+
+@asr_app.command("bench")
+def asr_bench(
+    path: str = typer.Option(..., help="First audio file path"),
+    path2: Optional[str] = typer.Option(None, help="Second audio file path"),
+    path3: Optional[str] = typer.Option(None, help="Third audio file path"),
+    models: str = typer.Option("small,medium", help="Comma-separated models"),
+    beam: int = typer.Option(5),
+    vad: bool = typer.Option(False),
+    word_ts: bool = typer.Option(False),
+    device: Optional[str] = typer.Option(None),
+) -> None:
+    paths = [path] + ([path2] if path2 else []) + ([path3] if path3 else [])
+    arg_paths = " ".join([f"--path '{p}'" for p in paths])
+    vad_flag = "--vad" if vad else "--no-vad"
+    wts_flag = "--word-ts" if word_ts else "--no-word-ts"
+    cmd = f"python -m mobasher.asr.bench run {arg_paths} --models '{models}' --beam {beam} {vad_flag} {wts_flag}" + (f" --device {device}" if device else "")
+    code = _run(cmd, cwd=_repo_root())
+    raise typer.Exit(code)
+
+
 if __name__ == "__main__":
     main()
 

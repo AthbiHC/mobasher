@@ -15,6 +15,8 @@ from .schemas import (
     PaginatedRecordings,
     PaginatedSegments,
     PageMeta,
+    PaginatedTranscripts,
+    SegmentWithTranscript,
 )
 from .deps import get_db
 from mobasher.storage.repositories import (
@@ -23,6 +25,7 @@ from mobasher.storage.repositories import (
     upsert_channel,
     list_recent_recordings,
     list_segments,
+    list_recent_transcripts,
 )
 
 
@@ -95,5 +98,19 @@ def api_list_segments(
     items = list_segments(db, channel_id=channel_id, start=start, end=end, limit=limit, offset=offset, status=status)
     next_offset = offset + len(items) if len(items) == limit else None
     return PaginatedSegments(items=items, meta=PageMeta(limit=limit, offset=offset, next_offset=next_offset))
+
+
+@router.get("/transcripts", response_model=PaginatedTranscripts, tags=["transcripts"]) 
+def api_list_transcripts(
+    channel_id: Optional[str] = Query(None),
+    since: Optional[datetime] = Query(None),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+) -> PaginatedTranscripts:
+    pairs = list_recent_transcripts(db, channel_id=channel_id, since=since, limit=limit, offset=offset)
+    items = [SegmentWithTranscript(segment=p[0], transcript=p[1]) for p in pairs]
+    next_offset = offset + len(items) if len(items) == limit else None
+    return PaginatedTranscripts(items=items, meta=PageMeta(limit=limit, offset=offset, next_offset=next_offset))
 
 

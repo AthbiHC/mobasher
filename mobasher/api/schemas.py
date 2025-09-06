@@ -78,3 +78,25 @@ class PaginatedSegments(BaseModel):
     meta: PageMeta
 
 
+class TranscriptOut(BaseModel):
+    segment_id: UUID
+    segment_started_at: datetime
+    language: str
+    text: str
+    confidence: Optional[float] = None
+    model_name: str
+
+    class Config:
+        from_attributes = True
+
+
+class SegmentWithTranscript(BaseModel):
+    segment: SegmentOut
+    transcript: TranscriptOut
+
+
+class PaginatedTranscripts(BaseModel):
+    items: list[SegmentWithTranscript]
+    meta: PageMeta
+
+
