@@ -54,3 +54,4 @@ This document tracks noteworthy changes, fixes, and operational learnings. Keep 
   - Stored in `visual_events.data` with `region`, `aggregated=true`, `font_px`, `tokens[]`
 - DB: enforced UTF-8 client encoding on all connections
 - Ops: helper scripts used to truncate `visual_events` and clear screenshots for clean benchmarking
+ - Docs: Added Phase 3 prioritized list to `PHASES.md`; commands updated for vision reprocess/reset

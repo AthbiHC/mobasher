@@ -52,6 +52,22 @@ This document outlines the development phases, scope, deliverables, and acceptan
 - Acceptance:
   - Events appear for sample videos; queries list expected data
 
+### Phase 3 prioritized tasks (current)
+1. OCR dedup + temporal smoothing
+   - Merge near-duplicate OCR (full vs ROI and across adjacent frames) using bbox IoU + text similarity; produce canonical spans with start/end_ms and aggregate confidence.
+2. /visual-events API (query + QC)
+   - FastAPI endpoint with filters (`channel_id`, `type`, `region`, `since/until`, `min_conf`, `q`) and pagination; return screenshot URLs.
+3. Object detection (YOLO)
+   - Integrate Ultralytics YOLOv8/YOLOv10; write `event_type='object'` with class, bbox, confidence; tune FPS/NMS.
+4. Face recognition (InsightFace)
+   - SCRFD detect + ArcFace embeddings; gallery-based ID; store `identity` and score; simple IoU tracker for spans.
+5. Batch reprocess CLI
+   - `mediaview vision reprocess --channel ... --since ... --ops ocr,objects,faces --fps 1` (idempotent, resumable, summary).
+6. Confidence population fix (OCR)
+   - Use EasyOCR `paragraph=False` for raw to capture per-box confidence; aggregate for region-level rows; backfill during dedup.
+7. Screenshot policy + retention
+   - Save aggregated-per-region shots (or every Nth); optional S3/MinIO; cleanup job for raw/expired files.
+
 ## Phase 4: Monitoring & Ops
 - Scope:
   - Prometheus metrics across recorder/API/workers

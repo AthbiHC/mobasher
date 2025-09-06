@@ -22,6 +22,9 @@ This document catalogs common commands and workflows for developing, running, an
 ## 2) Repository Workflow (custom assistant commands)
 
 - "push the push": Updates docs as needed, commits all changes, pushes to current branch, then creates and switches to the next sequential `alpha-XXX` branch.
+## 9) Vision utilities
+- Reprocess (batch): `./scripts/mediaview vision reprocess --channel <id> --since <iso> --until <iso> --ops ocr,objects,faces --fps 1`
+- Reset OCR artifacts (manual): truncate `visual_events`, delete `${MOBASHER_SCREENSHOT_ROOT}` files.
 - "sync docs": Updates README and docs (including `docs/CHANGES-LOG.md`) to reflect changes, commits with a docs message, and pushes to the current branch (no branch switching).
 - "fresh branch": Creates a new branch with `feature/<name>` or `fix/<name>`.
 - "status check": Shows git status, recent commits, and a quick project structure overview.
