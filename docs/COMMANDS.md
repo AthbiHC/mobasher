@@ -32,6 +32,16 @@ This document catalogs common commands and workflows for developing, running, an
   - Install: `source mobasher/venv/bin/activate && pip install onnxruntime==1.22.1 insightface==0.7.3`
   - Set gallery: export `FACES_GALLERY_DIR=/path/to/gallery/<identity>/*.jpg`
   - Enqueue: `./scripts/mediaview vision enqueue --limit 10` (faces runs with OCR/objects)
+
+## 10) Gallery (Arabic public figures)
+- Print SPARQL URL to export candidates CSV:
+  ```bash
+  PYTHONPATH=. mobasher/venv/bin/python scripts/gallery_builder.py export --limit 500
+  ```
+- Emit placeholder download plan (no downloads performed):
+  ```bash
+  PYTHONPATH=. mobasher/venv/bin/python scripts/gallery_builder.py plan
+  ```
 - "sync docs": Updates README and docs (including `docs/CHANGES-LOG.md`) to reflect changes, commits with a docs message, and pushes to the current branch (no branch switching).
 - "fresh branch": Creates a new branch with `feature/<name>` or `fix/<name>`.
 - "status check": Shows git status, recent commits, and a quick project structure overview.
