@@ -8,6 +8,7 @@ This document catalogs common commands and workflows for developing, running, an
 - Examples:
   - Start recorder: `./scripts/mediaview recorder start --config mobasher/channels/kuwait1.yaml`
   - Status/Stop: `./scripts/mediaview recorder status` / `./scripts/mediaview recorder stop` (also cleans up lingering ffmpeg)
+  - API server: `./scripts/mediaview api serve --host 127.0.0.1 --port 8001` (add `--public` to bind 0.0.0.0)
   - Truncate DB: `./scripts/mediaview db truncate --yes`
   - Retention: `./scripts/mediaview db retention --dry-run`
 
@@ -101,7 +102,12 @@ docker-compose up -d postgres redis
 docker-compose down
 ```
 
-## 6) Tests
+## 6) API
+
+- Base URL (dev): `http://127.0.0.1:8001`
+- See `docs/API.md` for endpoints and examples
+
+## 7) Tests
 
 - Install test dependencies (inside venv):
 ```bash
@@ -113,7 +119,7 @@ pip install -r mobasher/requirements.txt
 PYTHONPATH=. mobasher/venv/bin/python -m pytest -q mobasher/tests/test_db_integration.py
 ```
 
-## 7) General setup
+## 8) General setup
 
 - Create/activate venv and install packages:
 ```bash

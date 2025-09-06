@@ -102,6 +102,7 @@ alembic upgrade head
 - **[Project Journal](docs/PROJECT-JOURNAL.md)** - Development progress and architectural decisions
 - **[TODO List](docs/TODO.md)** - Current priorities and development roadmap
 - **[Change Log](docs/CHANGES-LOG.md)** - Chronological list of changes and fixes
+- **[API](docs/API.md)** - Endpoints and usage examples
 
 ## Development Workflow
 ### Run recorder (recommended via CLI)
