@@ -21,6 +21,7 @@ import uuid
 import os
 import sys
 from pathlib import Path as _Path
+import platform
 
 # Ensure project root is on sys.path when running from within the package directory
 _project_root = str(_Path(__file__).resolve().parents[2])
@@ -79,6 +80,12 @@ class DualHLSRecorder:
             '720p': {'resolution': '1280x720', 'bitrate': '2500k', 'fps': 25},
             '1080p': {'resolution': '1920x1080', 'bitrate': '4500k', 'fps': 25},
         })
+        # Encoder/preset tuning (reduce CPU; default to hardware on macOS)
+        default_encoder = 'h264_videotoolbox' if platform.system().lower() == 'darwin' else 'libx264'
+        self.video_encoder = video.get('encoder', default_encoder)
+        # For libx264, choose a faster preset by default; for videotoolbox, use realtime usage
+        self.video_preset = video.get('preset', 'veryfast' if self.video_encoder == 'libx264' else 'realtime')
+        self.video_threads = int(video.get('threads', 2))
 
     def _create_directories(self):
         """Compute folder paths and ensure they exist."""
@@ -142,10 +149,17 @@ class DualHLSRecorder:
         ]
         if header_string:
             cmd += ['-headers', header_string]
+        cmd += ['-i', stream_url, '-an']
+        # Video encoder selection and tuning
+        if self.video_encoder == 'libx264':
+            cmd += ['-c:v', 'libx264', '-preset', self.video_preset, '-threads', str(self.video_threads)]
+        else:
+            # Prefer hardware encoder when available (e.g., macOS)
+            cmd += ['-c:v', 'h264_videotoolbox']
+            # Use realtime mode for lower CPU and latency on hardware path
+            if self.video_preset == 'realtime':
+                cmd += ['-realtime', 'true']
         cmd += [
-            '-i', stream_url,
-            '-an',
-            '-c:v', 'libx264', '-preset', 'medium',
             '-s', v['resolution'], '-b:v', v['bitrate'], '-r', str(v['fps']),
             '-movflags', '+faststart', '-pix_fmt', 'yuv420p',
             '-g', str(int(v['fps']) * 2), '-keyint_min', str(int(v['fps'])),
@@ -165,16 +179,21 @@ class DualHLSRecorder:
         v = self._get_video_params(self.archive_quality)
         archive_pattern = str(self.archive_dir / f"{self.channel_id}-archive-%Y%m%d-%H%M%S.mp4")
         cmd: List[str] = [
-            'ffmpeg', '-nostdin',
+            'ffmpeg', '-nostdin', '-loglevel', 'error',
             '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
             '-user_agent', headers.get('User-Agent', 'Mobasher/1.0'),
         ]
         if header_string:
             cmd += ['-headers', header_string]
+        cmd += ['-i', stream_url, '-map', '0:v:0', '-map', '0:a:0']
+        if self.video_encoder == 'libx264':
+            cmd += ['-c:v', 'libx264', '-preset', self.video_preset, '-threads', str(self.video_threads)]
+        else:
+            cmd += ['-c:v', 'h264_videotoolbox']
+            if self.video_preset == 'realtime':
+                cmd += ['-realtime', 'true']
         cmd += [
-            '-i', stream_url,
-            '-map', '0:v:0', '-map', '0:a:0',
-            '-c:v', 'libx264', '-preset', 'slow', '-s', v['resolution'], '-b:v', v['bitrate'], '-r', str(v['fps']),
+            '-s', v['resolution'], '-b:v', v['bitrate'], '-r', str(v['fps']),
             '-g', str(int(v['fps']) * 2), '-keyint_min', str(int(v['fps'])),
             '-force_key_frames', f"expr:gte(t,n_forced*{self.archive_segment_seconds})",
             '-c:a', 'aac', '-b:a', '128k',
@@ -199,14 +218,29 @@ class DualHLSRecorder:
         # Launch separate audio/video recorders for robustness
         if self.audio_enabled:
             audio_cmd = self._build_audio_command()
-            self.process_audio_recorder = await asyncio.create_subprocess_exec(*audio_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            self.process_audio_recorder = await asyncio.create_subprocess_exec(
+                *audio_cmd,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                preexec_fn=os.setsid,
+            )
         if self.video_enabled:
             video_cmd = self._build_video_command()
-            self.process_video_recorder = await asyncio.create_subprocess_exec(*video_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            self.process_video_recorder = await asyncio.create_subprocess_exec(
+                *video_cmd,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                preexec_fn=os.setsid,
+            )
         if self.archive_enabled:
             self._create_directories()
             arch_cmd = self._build_archive_command()
-            self.archive_recorder = await asyncio.create_subprocess_exec(*arch_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            self.archive_recorder = await asyncio.create_subprocess_exec(
+                *arch_cmd,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                preexec_fn=os.setsid,
+            )
         self.running = True
         return self.recording_id
 
@@ -236,11 +270,21 @@ class DualHLSRecorder:
         if not process:
             return
         try:
-            process.send_signal(signal.SIGINT)
+            try:
+                pgid = os.getpgid(process.pid)
+            except Exception:
+                pgid = None
+            if pgid:
+                os.killpg(pgid, signal.SIGTERM)
+            else:
+                process.send_signal(signal.SIGTERM)
             try:
                 await asyncio.wait_for(process.wait(), timeout=10.0)
             except asyncio.TimeoutError:
-                process.kill()
+                if pgid:
+                    os.killpg(pgid, signal.SIGKILL)
+                else:
+                    process.kill()
                 await process.wait()
         except Exception:
             pass
@@ -539,9 +583,19 @@ async def main():
     rec_id = await recorder.start_recording()
     logger.info(f'Recording started | id={rec_id} | channel={recorder.channel_id}')
 
+    # Graceful shutdown on SIGINT/SIGTERM/SIGHUP
+    stop_event: asyncio.Event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        try:
+            loop.add_signal_handler(sig, stop_event.set)
+        except NotImplementedError:
+            # Some platforms (e.g., Windows) may not support add_signal_handler
+            pass
+
     start_time = time.time()
     try:
-        while True:
+        while not stop_event.is_set():
             # Heartbeat status
             try:
                 segs = await recorder.get_new_segments()

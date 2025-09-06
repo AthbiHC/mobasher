@@ -9,6 +9,12 @@ This file tracks major decisions, progress, and context for maintaining continui
 - **Current Branch**: alpha-003
 
 ## Architecture Decisions
+### 2025-09-06 - Recorder shutdown + FFmpeg CPU tuning
+- Added signal handling (SIGINT/SIGTERM/SIGHUP) and process-group termination to ensure ffmpeg child processes exit cleanly
+- Silenced ffmpeg stdio and avoided pipe buildup to reduce CPU overhead
+- Introduced configurable encoder/preset/threads under `video` with macOS default to `h264_videotoolbox` (hardware); fallback `libx264` uses faster presets
+- CLI `recorder stop` now also kills lingering ffmpeg processes matching `Mobasher/1.0` User-Agent
+
 
 ### 2024-12-19 - Project Structure
 - **Decision**: Clean two-folder structure with only `docs/` and `mobasher/` in root

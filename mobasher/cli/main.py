@@ -51,9 +51,12 @@ def recorder_status() -> None:
 
 
 @recorder_app.command("stop")
-def recorder_stop() -> None:
-    code = _run("pkill -f 'ingestion/recorder.py' || true", cwd=_repo_root())
-    raise typer.Exit(code)
+def recorder_stop(force: bool = typer.Option(True, help="Also kill lingering ffmpeg with Mobasher UA")) -> None:
+    rc = _run("pkill -f 'ingestion/recorder.py' || true", cwd=_repo_root())
+    if force:
+        # Terminate any ffmpeg processes started by our recorder (identified by UA)
+        _run("pkill -f \"ffmpeg.*Mobasher/1.0\" || true", cwd=_repo_root())
+    raise typer.Exit(rc)
 
 
 @recorder_app.command("logs")

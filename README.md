@@ -101,9 +101,22 @@ alembic upgrade head
 - **[Main Documentation](docs/Main-Document.md)** - Comprehensive technical overview
 - **[Project Journal](docs/PROJECT-JOURNAL.md)** - Development progress and architectural decisions
 - **[TODO List](docs/TODO.md)** - Current priorities and development roadmap
+- **[Change Log](docs/CHANGES-LOG.md)** - Chronological list of changes and fixes
 
 ## Development Workflow
-### Run recorder in background (local)
+### Run recorder (recommended via CLI)
+```bash
+# Wrapper script
+./scripts/mediaview recorder start --config mobasher/channels/kuwait1.yaml --heartbeat 15
+
+# Check status
+./scripts/mediaview recorder status
+
+# View logs
+./scripts/mediaview recorder logs -f
+```
+
+Alternative (manual background run):
 ```bash
 cd mobasher/ingestion
 source ../venv/bin/activate
@@ -115,12 +128,31 @@ nohup python recorder.py --config ../channels/kuwait1.yaml --heartbeat 15 > reco
 
 ### Recorder status and stop
 ```bash
-# Check if recorder process is running
-pgrep -af 'ingestion/recorder.py' || echo "Recorder not running"
+# Preferred (CLI ensures cleanup of lingering ffmpeg)
+./scripts/mediaview recorder status
+./scripts/mediaview recorder stop
 
-# Stop recorder
+# Manual (fallback)
+pgrep -af 'ingestion/recorder.py' || echo "Recorder not running"
 pkill -f 'ingestion/recorder.py' || true
+# If needed, also kill any ffmpeg started by our recorder (matches User-Agent)
+pkill -f "ffmpeg.*Mobasher/1.0" || true
 ```
+
+### FFmpeg CPU tuning and macOS hardware acceleration
+- Default behavior now prefers hardware H.264 on macOS for lower CPU, falling back to `libx264` elsewhere.
+- You can override encoder/preset/threads per channel in YAML under `video`:
+```yaml
+video:
+  encoder: h264_videotoolbox   # macOS hardware, use 'libx264' for CPU encode
+  preset: realtime              # for libx264 use 'veryfast' or 'superfast'
+  threads: 2                    # libx264 encoding threads
+  qualities:
+    "720p": { resolution: "1280x720", bitrate: "2500k", fps: 25 }
+```
+Notes:
+- Recorder handles SIGINT/SIGTERM and kills child ffmpeg processes via process groups.
+- The CLI `recorder stop` additionally cleans up any lingering ffmpeg that include the `Mobasher/1.0` User-Agent.
 
 ### Truncate database tables (fresh start)
 ```bash

@@ -7,14 +7,14 @@ This document catalogs common commands and workflows for developing, running, an
 - Preferred usage via wrapper: `./scripts/mediaview --help`
 - Examples:
   - Start recorder: `./scripts/mediaview recorder start --config mobasher/channels/kuwait1.yaml`
-  - Status/Stop: `./scripts/mediaview recorder status` / `./scripts/mediaview recorder stop`
+  - Status/Stop: `./scripts/mediaview recorder status` / `./scripts/mediaview recorder stop` (also cleans up lingering ffmpeg)
   - Truncate DB: `./scripts/mediaview db truncate --yes`
   - Retention: `./scripts/mediaview db retention --dry-run`
 
 ## 2) Repository Workflow (custom assistant commands)
 
 - "push the push": Updates docs as needed, commits all changes, pushes to current branch, then creates and switches to the next sequential `alpha-XXX` branch.
-- "sync docs": Updates README and docs to reflect changes, commits with a docs message, and pushes to the current branch (no branch switching).
+- "sync docs": Updates README and docs (including `docs/CHANGES-LOG.md`) to reflect changes, commits with a docs message, and pushes to the current branch (no branch switching).
 - "fresh branch": Creates a new branch with `feature/<name>` or `fix/<name>`.
 - "status check": Shows git status, recent commits, and a quick project structure overview.
 - "quick test": Runs basic validation (lint/format/tests) suitable for fast feedback.
@@ -32,9 +32,16 @@ source ../venv/bin/activate
 export MOBASHER_DATA_ROOT=/Volumes/ExternalDB/Media-View-Data/data/
 nohup python recorder.py --config ../channels/kuwait1.yaml --data-root ${MOBASHER_DATA_ROOT:-../data} --heartbeat 15 > recorder.log 2>&1 &
 ```
-- Stop recorder:
+- Stop recorder (preferred):
+```bash
+./scripts/mediaview recorder stop
+```
+
+- Manual stop (fallback):
 ```bash
 pkill -f 'ingestion/recorder.py' || true
+# Also terminate any ffmpeg processes started by our recorder (identified by UA)
+pkill -f "ffmpeg.*Mobasher/1.0" || true
 ```
 - Tail logs:
 ```bash

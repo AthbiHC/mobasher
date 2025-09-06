@@ -14,15 +14,13 @@ recording:
   video_enabled: true             # Enable video recording
   audio_enabled: true             # Enable audio recording
   video_quality: "720p"           # Configurable quality
-  video_codec: "libx264"          # H.264 codec
-  video_preset: "medium"          # Encoding speed vs quality balance
+  # Note: encoder/preset are configured under the top-level 'video' section
   
   # Archive recorder settings (1-hour segments for viewing)
   archive_enabled: true
   archive_segment_seconds: 3600   # 1 hour segments
   archive_quality: "1080p"        # Higher quality for viewing
-  archive_codec: "libx264"
-  archive_preset: "slow"          # Better quality for archive
+  # Note: archive uses same encoder defaults as 'video' unless overridden in code
   
   # Reconnection settings
   reconnect_attempts: 5
@@ -35,6 +33,11 @@ audio:
   bitrate: "128k"                 # For archive quality
 
 video:
+  # Encoder/preset/threads for CPU tuning (new)
+  # macOS recommended defaults:
+  encoder: h264_videotoolbox      # Use 'libx264' for CPU encoding
+  preset: realtime                # With libx264, prefer 'veryfast' or 'superfast'
+  threads: 2                      # Only used by libx264
   # Quality presets
   qualities:
     "720p":

@@ -34,6 +34,8 @@ Television remains one of the most influential media channels, yet systematic an
 - **Robust Recording**: 24/7 operation with automatic reconnection and error recovery
 - **Audio Segmentation**: Splits streams into 60-second chunks optimized for processing
 - **Scalable Design**: Independent processing per channel allows easy expansion
+ - **Graceful Shutdown**: Recorder installs SIGINT/SIGTERM/SIGHUP handlers and kills child ffmpeg via process groups to prevent orphans
+ - **CPU Tuning**: Supports hardware H.264 on macOS (`h264_videotoolbox`) or CPU encoding (`libx264`) with configurable presets/threads
 
 #### **2. Advanced Audio Processing**
 - **Arabic ASR**: Real-time speech-to-text using faster-whisper with Arabic language models
@@ -74,6 +76,23 @@ Television remains one of the most influential media channels, yet systematic an
 ### **Development Stack**
 - **Backend**: Python with FastAPI, SQLAlchemy, Pydantic
 - **Stream Processing**: FFmpeg, PyAV for media handling
+
+#### Recorder configuration (excerpt)
+```yaml
+recording:
+  segment_seconds: 60
+  video_enabled: true
+  audio_enabled: true
+  video_quality: "720p"
+
+video:
+  encoder: h264_videotoolbox   # macOS hardware; use 'libx264' for CPU
+  preset: realtime              # with libx264, prefer 'veryfast' or 'superfast'
+  threads: 2
+  qualities:
+    "720p": { resolution: "1280x720", bitrate: "2500k", fps: 25 }
+    "1080p": { resolution: "1920x1080", bitrate: "4500k", fps: 25 }
+```
 - **Containerization**: Docker with multi-service orchestration
 - **Configuration**: YAML-based channel configuration with environment management
 
