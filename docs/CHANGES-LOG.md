@@ -55,3 +55,8 @@ This document tracks noteworthy changes, fixes, and operational learnings. Keep 
 - DB: enforced UTF-8 client encoding on all connections
 - Ops: helper scripts used to truncate `visual_events` and clear screenshots for clean benchmarking
  - Docs: Added Phase 3 prioritized list to `PHASES.md`; commands updated for vision reprocess/reset
+
+## 2025-09-06T13:50:00Z
+- Vision: added YOLO-based object detection (`vision.objects_segment`) with configurable FPS/conf/classes
+- Enqueue now runs objects alongside OCR; screenshots saved as `<video-base>-seg_<index>_objects.jpg`
+- API: `/visual-events` endpoint with filters (channel, type, region, time, q, min_conf)

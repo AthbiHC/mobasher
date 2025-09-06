@@ -65,6 +65,8 @@ This document describes the end-to-end technical stack for Mobasher, covering in
   - Aggregated per region per frame: merged `bbox`, concatenated `text`, `font_px` (bbox height proxy), `tokens[]` with individual boxes.
   - Screenshots: saved per region using `<video-base>-seg_<index>_<region>.jpg` for QC.
 - Object detection: YOLOv8/YOLOv10 (ultralytics) for people, vehicles, logos, UI elements.
+  - Task: `vision.objects_segment`; config: `objects_fps`, `yolo_model`, `objects_conf_threshold`, `objects_classes`.
+  - Writes `event_type='object'` with `data.class`, `bbox`, `confidence`; screenshots `<video-base>-seg_<index>_objects.jpg`.
 - Face recognition: InsightFace; gallery-based identity matching.
 - Optional: scene change detection for program segmentation.
 - Post-processing: deduplicate near-identical events, temporal smoothing, normalized boxes.

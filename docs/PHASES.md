@@ -59,6 +59,7 @@ This document outlines the development phases, scope, deliverables, and acceptan
    - FastAPI endpoint with filters (`channel_id`, `type`, `region`, `since/until`, `min_conf`, `q`) and pagination; return screenshot URLs.
 3. Object detection (YOLO)
    - Integrate Ultralytics YOLOv8/YOLOv10; write `event_type='object'` with class, bbox, confidence; tune FPS/NMS.
+   - Implemented: `vision.objects_segment` with screenshots and filters; counts by class available via SQL/API.
 4. Face recognition (InsightFace)
    - SCRFD detect + ArcFace embeddings; gallery-based ID; store `identity` and score; simple IoU tracker for spans.
 5. Batch reprocess CLI
