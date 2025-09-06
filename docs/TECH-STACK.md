@@ -67,6 +67,9 @@ This document describes the end-to-end technical stack for Mobasher, covering in
 - Object detection: YOLOv8/YOLOv10 (ultralytics) for people, vehicles, logos, UI elements.
   - Task: `vision.objects_segment`; config: `objects_fps`, `yolo_model`, `objects_conf_threshold`, `objects_classes`.
   - Writes `event_type='object'` with `data.class`, `bbox`, `confidence`; screenshots `<video-base>-seg_<index>_objects.jpg`.
+- Face recognition: InsightFace (SCRFD detect + ArcFace embeddings) with cosine matching against a gallery.
+  - Task: `vision.faces_segment`; config: `faces_fps`, `faces_det_thresh`, `faces_rec_thresh`, `faces_model`, `faces_gallery_dir`.
+  - Write `event_type='face'` with `data.identity` and `confidence`; screenshots `<video-base>-seg_<index>_faces.jpg`.
 - Face recognition: InsightFace; gallery-based identity matching.
 - Optional: scene change detection for program segmentation.
 - Post-processing: deduplicate near-identical events, temporal smoothing, normalized boxes.

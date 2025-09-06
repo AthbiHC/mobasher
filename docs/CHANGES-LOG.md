@@ -60,3 +60,7 @@ This document tracks noteworthy changes, fixes, and operational learnings. Keep 
 - Vision: added YOLO-based object detection (`vision.objects_segment`) with configurable FPS/conf/classes
 - Enqueue now runs objects alongside OCR; screenshots saved as `<video-base>-seg_<index>_objects.jpg`
 - API: `/visual-events` endpoint with filters (channel, type, region, time, q, min_conf)
+
+## 2025-09-06T14:20:00Z
+- Vision: added InsightFace-based face recognition (`vision.faces_segment`), configurable thresholds and gallery
+- Docs: updated TECH-STACK and COMMANDS for faces setup; PHASES marked as implemented

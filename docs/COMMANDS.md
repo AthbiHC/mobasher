@@ -28,6 +28,10 @@ This document catalogs common commands and workflows for developing, running, an
 - Run object detection for recent segments:
   - Install once: `source mobasher/venv/bin/activate && pip install ultralytics==8.3.67`
   - Enqueue: `./scripts/mediaview vision enqueue --limit 10` (runs OCR and objects)
+- Face recognition:
+  - Install: `source mobasher/venv/bin/activate && pip install onnxruntime==1.22.1 insightface==0.7.3`
+  - Set gallery: export `FACES_GALLERY_DIR=/path/to/gallery/<identity>/*.jpg`
+  - Enqueue: `./scripts/mediaview vision enqueue --limit 10` (faces runs with OCR/objects)
 - "sync docs": Updates README and docs (including `docs/CHANGES-LOG.md`) to reflect changes, commits with a docs message, and pushes to the current branch (no branch switching).
 - "fresh branch": Creates a new branch with `feature/<name>` or `fix/<name>`.
 - "status check": Shows git status, recent commits, and a quick project structure overview.
