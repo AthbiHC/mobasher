@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -99,4 +99,29 @@ class PaginatedTranscripts(BaseModel):
     items: list[SegmentWithTranscript]
     meta: PageMeta
 
+
+# -------- Visual Events --------
+
+class VisualEventOut(BaseModel):
+    id: UUID
+    segment_id: UUID
+    segment_started_at: datetime
+    channel_id: str
+    timestamp_offset: float
+    event_type: str
+    bbox: Optional[List[int]] = None
+    confidence: Optional[float] = None
+    data: Dict[str, Any]
+    created_at: datetime
+    video_filename: Optional[str] = None
+    screenshot_path: Optional[str] = None
+    frame_timestamp_ms: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PaginatedVisualEvents(BaseModel):
+    items: list[VisualEventOut]
+    meta: PageMeta
 

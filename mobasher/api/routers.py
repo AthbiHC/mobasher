@@ -17,6 +17,8 @@ from .schemas import (
     PageMeta,
     PaginatedTranscripts,
     SegmentWithTranscript,
+    PaginatedVisualEvents,
+    VisualEventOut,
 )
 from .deps import get_db
 from mobasher.storage.repositories import (
@@ -27,6 +29,7 @@ from mobasher.storage.repositories import (
     list_segments,
     list_recent_transcripts,
 )
+from mobasher.storage.models import VisualEvent
 
 
 router = APIRouter()
@@ -112,5 +115,45 @@ def api_list_transcripts(
     items = [SegmentWithTranscript(segment=p[0], transcript=p[1]) for p in pairs]
     next_offset = offset + len(items) if len(items) == limit else None
     return PaginatedTranscripts(items=items, meta=PageMeta(limit=limit, offset=offset, next_offset=next_offset))
+
+@router.get("/visual-events", response_model=PaginatedVisualEvents, tags=["vision"]) 
+def api_list_visual_events(
+    channel_id: Optional[str] = Query(None),
+    event_type: Optional[str] = Query(None, pattern="^(ocr|object|face|logo|scene_change)$"),
+    region: Optional[str] = Query(None, description="Filter by data.region"),
+    q: Optional[str] = Query(None, description="Contains search in data.text (simple ILIKE)"),
+    since: Optional[datetime] = Query(None),
+    until: Optional[datetime] = Query(None),
+    min_conf: Optional[float] = Query(None, ge=0, le=1),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+) -> PaginatedVisualEvents:
+    # Build query with simple filters; for performance, consider indexes on created_at/channel
+    query = db.query(VisualEvent)
+    if channel_id:
+        query = query.filter(VisualEvent.channel_id == channel_id)
+    if event_type:
+        query = query.filter(VisualEvent.event_type == event_type)
+    if min_conf is not None:
+        query = query.filter(VisualEvent.confidence >= min_conf)
+    if since:
+        query = query.filter(VisualEvent.created_at >= since)
+    if until:
+        query = query.filter(VisualEvent.created_at < until)
+    if region:
+        from sqlalchemy import cast
+        from sqlalchemy.dialects.postgresql import JSONB
+        query = query.filter(cast(VisualEvent.data, JSONB)["region"].astext == region)
+    if q:
+        from sqlalchemy import func
+        query = query.filter(func.lower((VisualEvent.data["text"].astext))).like(f"%{q.lower()}%")
+
+    items = (
+        query.order_by(VisualEvent.created_at.desc()).offset(offset).limit(limit).all()
+    )
+    next_offset = offset + len(items) if len(items) == limit else None
+    return PaginatedVisualEvents(items=items, meta=PageMeta(limit=limit, offset=offset, next_offset=next_offset))
+
 
 

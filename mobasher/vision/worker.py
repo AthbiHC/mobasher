@@ -22,6 +22,11 @@ class VisionSettings(BaseSettings):
     enable_roi_center: bool = True
     roi_center_top: float = 0.30
     roi_center_bottom: float = 0.70
+    # OCR dedup & smoothing
+    ocr_write_raw: bool = False
+    ocr_iou_threshold: float = 0.3
+    ocr_text_sim_threshold: float = 0.6
+    ocr_merge_window_s: float = 2.0
 
 
 settings = VisionSettings()
@@ -140,6 +145,8 @@ def ocr_segment(self, segment_id: str, segment_started_at_iso: str) -> Dict[str,
         timestamps = _sample_timestamps(duration_s, settings.ocr_fps)
 
         events = 0
+        # Keep aggregated per-frame OCR here to deduplicate later
+        aggregated_frames: List[Dict[str, Any]] = []
         ocr = _get_ocr()
         import os
         screenshot_root = os.environ.get('MOBASHER_SCREENSHOT_ROOT', '/Volumes/ExternalDB/Media-View-Data/data/screenshot')
@@ -169,38 +176,38 @@ def ocr_segment(self, segment_id: str, segment_started_at_iso: str) -> Dict[str,
                     cv2.imwrite(shot_path, sub)
                 except Exception:
                     pass
-                for item in results:
-                    # EasyOCR can return (bbox, text, conf) or (bbox, text) in paragraph mode
-                    if isinstance(item, (list, tuple)) and len(item) >= 2:
-                        box = item[0]
-                        text = item[1]
-                        conf = (item[2] if len(item) >= 3 else None)
-                    else:
-                        continue
-                    if not text or not str(text).strip():
-                        continue
-                    xs = [p[0] for p in box]
-                    ys = [p[1] for p in box]
-                    x_min, y_min = float(max(0, min(xs))) + rx, float(max(0, min(ys))) + ry
-                    x_max, y_max = float(min(rw, max(xs))) + rx, float(min(rh, max(ys))) + ry
-                    bbox = [int(x_min), int(y_min), int(max(1, x_max - x_min)), int(max(1, y_max - y_min))]
-                    ve = VisualEvent(
-                        id=None,
-                        segment_id=UUID(segment_id),
-                        segment_started_at=datetime.fromisoformat(segment_started_at_iso),
-                        channel_id=seg.channel_id,
-                        timestamp_offset=float(ts),
-                        event_type='ocr',
-                        bbox=bbox,
-                        confidence=float(conf) if conf is not None else None,
-                        data={"text": str(text).strip(), "lang": "ar", "region": region_name},
-                        video_path=seg.video_path,
-                        video_filename=fname,
-                        screenshot_path=shot_path,
-                        frame_timestamp_ms=int(ts*1000),
-                    )
-                    db.add(ve)
-                    events += 1
+                if settings.ocr_write_raw:
+                    for item in results:
+                        if isinstance(item, (list, tuple)) and len(item) >= 2:
+                            box = item[0]
+                            text = item[1]
+                            conf = (item[2] if len(item) >= 3 else None)
+                        else:
+                            continue
+                        if not text or not str(text).strip():
+                            continue
+                        xs = [p[0] for p in box]
+                        ys = [p[1] for p in box]
+                        x_min, y_min = float(max(0, min(xs))) + rx, float(max(0, min(ys))) + ry
+                        x_max, y_max = float(min(rw, max(xs))) + rx, float(min(rh, max(ys))) + ry
+                        bbox = [int(x_min), int(y_min), int(max(1, x_max - x_min)), int(max(1, y_max - y_min))]
+                        ve = VisualEvent(
+                            id=None,
+                            segment_id=UUID(segment_id),
+                            segment_started_at=datetime.fromisoformat(segment_started_at_iso),
+                            channel_id=seg.channel_id,
+                            timestamp_offset=float(ts),
+                            event_type='ocr',
+                            bbox=bbox,
+                            confidence=float(conf) if conf is not None else None,
+                            data={"text": str(text).strip(), "lang": "ar", "region": region_name},
+                            video_path=seg.video_path,
+                            video_filename=fname,
+                            screenshot_path=shot_path,
+                            frame_timestamp_ms=int(ts*1000),
+                        )
+                        db.add(ve)
+                        events += 1
                 # Aggregated sentence per region for this timestamp
                 tokens = []
                 union = None
@@ -225,30 +232,112 @@ def ocr_segment(self, segment_id: str, segment_started_at_iso: str) -> Dict[str,
                     tokens_sorted = sorted(tokens, key=lambda t: t["bbox"][0])
                     aggregated_text = " ".join(t["text"] for t in tokens_sorted)
                     font_px = max(t["bbox"][3] for t in tokens_sorted)
-                    ve_agg = VisualEvent(
-                        id=None,
-                        segment_id=UUID(segment_id),
-                        segment_started_at=datetime.fromisoformat(segment_started_at_iso),
-                        channel_id=seg.channel_id,
-                        timestamp_offset=float(ts),
-                        event_type='ocr',
-                        bbox=union if union is not None else [rx, ry, rw, rh],
-                        confidence=None,
-                        data={
-                            "text": aggregated_text.strip(),
-                            "lang": "ar",
-                            "region": region_name,
-                            "aggregated": True,
-                            "font_px": int(font_px),
-                            "tokens": tokens_sorted,
-                        },
-                        video_path=seg.video_path,
-                        video_filename=fname,
-                        screenshot_path=shot_path,
-                        frame_timestamp_ms=int(ts*1000),
-                    )
-                    db.add(ve_agg)
-                    events += 1
+                    aggregated_frames.append({
+                        "ts": float(ts),
+                        "region": region_name,
+                        "text": aggregated_text.strip(),
+                        "bbox": union if union is not None else [rx, ry, rw, rh],
+                        "font_px": int(font_px),
+                        "tokens": tokens_sorted,
+                        "shot": shot_path,
+                        "fname": fname,
+                    })
+        # Deduplicate aggregated frames into spans
+        def _iou(a: List[int], b: List[int]) -> float:
+            ax, ay, aw, ah = a
+            bx, by, bw, bh = b
+            ax2, ay2 = ax + aw, ay + ah
+            bx2, by2 = bx + bw, by + bh
+            inter_w = max(0, min(ax2, bx2) - max(ax, bx))
+            inter_h = max(0, min(ay2, by2) - max(ay, by))
+            inter = inter_w * inter_h
+            if inter <= 0:
+                return 0.0
+            union = aw * ah + bw * bh - inter
+            return inter / union if union > 0 else 0.0
+
+        try:
+            from rapidfuzz.fuzz import token_set_ratio as _sim  # type: ignore
+            def _text_sim(x: str, y: str) -> float:
+                return _sim(x, y) / 100.0
+        except Exception:
+            def _text_sim(x: str, y: str) -> float:
+                return 1.0 if x == y else 0.0
+
+        spans: List[Dict[str, Any]] = []
+        for region in {e["region"] for e in aggregated_frames}:
+            items = [e for e in aggregated_frames if e["region"] == region]
+            items.sort(key=lambda r: r["ts"])  # time ascending
+            current = None
+            for it in items:
+                if current is None:
+                    current = {
+                        "start": it["ts"],
+                        "end": it["ts"],
+                        "text": it["text"],
+                        "bbox": it["bbox"],
+                        "font_px": it["font_px"],
+                        "tokens": it["tokens"],
+                        "shot": it["shot"],
+                        "fname": it["fname"],
+                    }
+                    continue
+                time_ok = (it["ts"] - current["end"]) <= settings.ocr_merge_window_s
+                if time_ok and _text_sim(current["text"], it["text"]) >= settings.ocr_text_sim_threshold and _iou(current["bbox"], it["bbox"]) >= settings.ocr_iou_threshold:
+                    # extend span
+                    current["end"] = it["ts"]
+                    # union bbox
+                    cx, cy, cw, ch = current["bbox"]
+                    bx, by, bw, bh = it["bbox"]
+                    nx = min(cx, bx)
+                    ny = min(cy, by)
+                    nx2 = max(cx+cw, bx+bw)
+                    ny2 = max(cy+ch, by+bh)
+                    current["bbox"] = [nx, ny, nx2-nx, ny2-ny]
+                    current["font_px"] = max(current["font_px"], it["font_px"])
+                    continue
+                # finalize current
+                spans.append(current)
+                current = {
+                    "start": it["ts"],
+                    "end": it["ts"],
+                    "text": it["text"],
+                    "bbox": it["bbox"],
+                    "font_px": it["font_px"],
+                    "tokens": it["tokens"],
+                    "shot": it["shot"],
+                    "fname": it["fname"],
+                }
+            if current is not None:
+                spans.append(current)
+
+        # Write canonical span events
+        for sp in spans:
+            ve_span = VisualEvent(
+                id=None,
+                segment_id=UUID(segment_id),
+                segment_started_at=datetime.fromisoformat(segment_started_at_iso),
+                channel_id=seg.channel_id,
+                timestamp_offset=float(sp["start"]),
+                event_type='ocr',
+                bbox=[int(v) for v in sp["bbox"]],
+                confidence=None,
+                data={
+                    "text": sp["text"],
+                    "lang": "ar",
+                    "region": None,  # region not preserved after merge of full/ROI
+                    "aggregated": True,
+                    "font_px": int(sp["font_px"]),
+                    "tokens": sp["tokens"],
+                    "end_offset": float(sp["end"]),
+                },
+                video_path=seg.video_path,
+                video_filename=sp["fname"],
+                screenshot_path=sp["shot"],
+                frame_timestamp_ms=int(sp["start"]*1000),
+            )
+            db.add(ve_span)
+            events += 1
         db.commit()
 
     return {"ok": True, "events": events, "elapsed_ms": int((perf_counter() - start) * 1000)}
