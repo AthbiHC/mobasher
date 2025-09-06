@@ -202,9 +202,11 @@ def asr_enqueue(
     since: Optional[str] = typer.Option(None, help="ISO timestamp to start from (UTC)"),
     limit: int = typer.Option(200, help="Max segments to enqueue"),
 ) -> None:
-    ts = f" --since {since}" if since else ""
-    ch = f" --channel-id {channel_id}" if channel_id else ""
-    code = _run(f"python -c 'from mobasher.asr.enqueue import enqueue_missing; print(enqueue_missing({repr(channel_id)}, __import__(\"datetime\").datetime.fromisoformat(\"{since}\") if {repr(bool(since))} else None, {limit}))' | cat", cwd=_repo_root())
+    import sys
+    code = _run(
+        f"{sys.executable} -c 'from mobasher.asr.enqueue import enqueue_missing; import datetime as _d; print(enqueue_missing({repr(channel_id)}, _d.datetime.fromisoformat(\"{since}\") if {repr(bool(since))} else None, {limit}))' | cat",
+        cwd=_repo_root(),
+    )
     raise typer.Exit(code)
 
 
@@ -235,6 +237,28 @@ def asr_bench(
     wts_flag = "--word-ts" if word_ts else "--no-word-ts"
     cmd = f"python -m mobasher.asr.bench run {arg_paths} --models '{models}' --beam {beam} {vad_flag} {wts_flag}" + (f" --device {device}" if device else "")
     code = _run(cmd, cwd=_repo_root())
+    raise typer.Exit(code)
+
+
+vision_app = typer.Typer(help="Vision pipeline")
+app.add_typer(vision_app, name="vision")
+
+
+@vision_app.command("worker")
+def vision_worker(concurrency: int = typer.Option(2, help="Celery worker concurrency")) -> None:
+    import sys
+    cmd = f"{sys.executable} -m celery -A mobasher.vision.worker.app worker --loglevel=INFO -c {concurrency}"
+    code = _run(cmd, cwd=_repo_root())
+    raise typer.Exit(code)
+
+
+@vision_app.command("enqueue")
+def vision_enqueue(limit: int = typer.Option(20, help="How many segments to enqueue")) -> None:
+    import sys
+    code = _run(
+        f"{sys.executable} -c 'from mobasher.vision.enqueue import enqueue_vision_for_asr_processed; print(enqueue_vision_for_asr_processed({limit}))' | cat",
+        cwd=_repo_root(),
+    )
     raise typer.Exit(code)
 
 

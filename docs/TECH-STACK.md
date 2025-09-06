@@ -56,9 +56,14 @@ This document describes the end-to-end technical stack for Mobasher, covering in
   - Arabic text normalization post-step.
   - Split timing into `engine_time_ms` vs `total_time_ms` if needed.
 
-## 6) Vision Stack (Planned Next Phase)
-- Frame sampler: per-task FPS caps (e.g., OCR=1 fps, objects=2 fps, faces=1 fps).
-- OCR (Arabic): PaddleOCR (arabic models) for on-screen text (tickers/lower-thirds/graphics).
+## 6) Vision Stack
+- Frame sampler: per-task FPS caps (e.g., OCR=1–3 fps, objects=2 fps, faces=1 fps).
+- OCR (Arabic): EasyOCR currently integrated; region-of-interest (ROI) bands for `headline`, `ticker`, `center` plus full frame.
+- OCR preprocessing: grayscale → CLAHE → slight blur → OTSU threshold → invert.
+- OCR outputs:
+  - Raw detections: one event per detected box with `data.text`, `data.region`.
+  - Aggregated per region per frame: merged `bbox`, concatenated `text`, `font_px` (bbox height proxy), `tokens[]` with individual boxes.
+  - Screenshots: saved per region using `<video-base>-seg_<index>_<region>.jpg` for QC.
 - Object detection: YOLOv8/YOLOv10 (ultralytics) for people, vehicles, logos, UI elements.
 - Face recognition: InsightFace; gallery-based identity matching.
 - Optional: scene change detection for program segmentation.

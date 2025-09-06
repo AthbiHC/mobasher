@@ -228,6 +228,11 @@ class VisualEvent(Base):
         DateTime(timezone=True), 
         default=lambda: datetime.now(timezone.utc)
     )
+    # Media and QC metadata
+    video_path: Mapped[Optional[str]] = mapped_column(String)
+    video_filename: Mapped[Optional[str]] = mapped_column(String)
+    screenshot_path: Mapped[Optional[str]] = mapped_column(String)
+    frame_timestamp_ms: Mapped[Optional[int]] = mapped_column(Integer)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

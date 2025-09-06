@@ -16,6 +16,7 @@ This document catalogs common commands and workflows for developing, running, an
   - ASR enqueue: `./scripts/mediaview asr enqueue --channel-id kuwait_news --since 2025-09-05T00:00:00Z --limit 50`
   - ASR scheduler: `./scripts/mediaview asr scheduler --interval 30 --lookback 10`
   - Truncate DB: `./scripts/mediaview db truncate --yes`
+  - Reset vision artifacts (manual): truncate `visual_events` and delete screenshots under `${MOBASHER_SCREENSHOT_ROOT:-/Volumes/ExternalDB/Media-View-Data/data/screenshot}`.
   - Retention: `./scripts/mediaview db retention --dry-run`
 
 ## 2) Repository Workflow (custom assistant commands)
@@ -146,4 +147,5 @@ alembic upgrade head
 
 - Recorder writes `recordings` and `segments` to DB by default.
 - `pgvector` and TimescaleDB are used in dev; migrations ensure extensions/policies in the main DB.
+- Vision OCR screenshots are named `<video-base>-seg_<index>_<region>.jpg` (e.g., `kuwait_news-20250906-083936-seg_59_headline.jpg`).
 - For quick local tests without Timescale features, use the Testcontainers integration test which bootstraps a temporary Postgres and creates the ORM schema.

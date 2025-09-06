@@ -16,6 +16,7 @@ from pydantic import Field
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import event
 
 
 class DBSettings(BaseSettings):
@@ -55,6 +56,16 @@ def init_engine(settings: Optional[DBSettings] = None) -> Engine:
             max_overflow=10,
             future=True,
         )
+        # Ensure UTF-8 client encoding on every connection
+        @event.listens_for(_engine, "connect")
+        def _set_client_encoding(dbapi_connection, connection_record):  # type: ignore[no-redef]
+            try:
+                cur = dbapi_connection.cursor()
+                cur.execute("SET client_encoding TO 'UTF8'")
+                cur.close()
+            except Exception:
+                # Best-effort; psycopg3 should already use UTF-8
+                pass
         SessionLocal = sessionmaker(
             bind=_engine, autoflush=False, autocommit=False, expire_on_commit=False, class_=Session
         )

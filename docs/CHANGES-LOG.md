@@ -44,3 +44,13 @@ This document tracks noteworthy changes, fixes, and operational learnings. Keep 
 ## 2025-09-06T00:00:06Z
 - Vision: add OCR worker (EasyOCR) and enqueue command, initial 1 fps → 3 fps
 - Vision: frame sampling via OpenCV; events persisted to `visual_events`
+
+## 2025-09-06T13:20:00Z
+- Vision OCR improvements:
+  - ROI-based OCR for `headline`, `ticker`, and `center` regions, plus full-frame fallback
+  - Lightweight preprocessing (grayscale → CLAHE → blur → OTSU → invert) for better Arabic overlays
+  - Per-region screenshots with descriptive names: `<video-base>-seg_<index>_<region>.jpg`
+  - Aggregated sentences per region at each timestamp with merged `bbox`, `font_px` (approx), and `tokens`
+  - Stored in `visual_events.data` with `region`, `aggregated=true`, `font_px`, `tokens[]`
+- DB: enforced UTF-8 client encoding on all connections
+- Ops: helper scripts used to truncate `visual_events` and clear screenshots for clean benchmarking
