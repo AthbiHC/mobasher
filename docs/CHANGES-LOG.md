@@ -36,3 +36,7 @@ This document tracks noteworthy changes, fixes, and operational learnings. Keep 
 ## 2025-09-06T00:00:04Z
 - Enqueue dedupe via Redis keys with TTL to avoid duplicate scheduling
 - Scheduler exponential backoff with jitter and success reset
+
+## 2025-09-06T00:00:05Z
+- CLI: run Celery via current Python interpreter to avoid PATH issues
+- Docs: clarify worker concurrency flags and device caveats (no 'metal' device)

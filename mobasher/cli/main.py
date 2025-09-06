@@ -183,7 +183,10 @@ app.add_typer(asr_app, name="asr")
 
 @asr_app.command("worker")
 def asr_worker() -> None:
-    code = _run("celery -A mobasher.asr.worker.app worker --loglevel=INFO", cwd=_repo_root())
+    import sys
+    # Use the same interpreter to run celery to avoid PATH issues
+    cmd = f"{sys.executable} -m celery -A mobasher.asr.worker.app worker --loglevel=INFO"
+    code = _run(cmd, cwd=_repo_root())
     raise typer.Exit(code)
 
 
