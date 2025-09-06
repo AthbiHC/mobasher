@@ -33,6 +33,12 @@ This document outlines the development phases, scope, deliverables, and acceptan
   - A sample WAV transcribed end-to-end; transcript persisted
   - Re-running the task does not duplicate transcripts
 
+- Optional (later enhancements):
+  - Enable `condition_on_previous_text` and per-channel `initial_prompt`
+  - Word-level timestamps (toggleable) or WhisperX alignment + diarization
+  - Post-processing normalization for Arabic text (punctuation, diacritics)
+  - Separate timing fields: `engine_time_ms` vs `total_time_ms`
+
 ## Phase 3: Vision Pipeline (OCR/Objects/Faces)
 - Scope:
   - Frame sampler with per-stream FPS throttles

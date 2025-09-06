@@ -78,6 +78,17 @@ def transcribe_segment(self, segment_id: str, segment_started_at_iso: str) -> di
         text = " ".join(t.strip() for t in texts).strip()
         confidence: Optional[float] = (sum(confidences) / len(confidences)) if confidences else None
 
+        # Build model_version using library versions for traceability
+        try:
+            from importlib.metadata import version as _pkg_version  # type: ignore
+            fw_v = _pkg_version("faster-whisper")
+            ct2_v = _pkg_version("ctranslate2")
+            model_version = f"fw-{fw_v}|ct2-{ct2_v}"
+        except Exception:
+            model_version = "unknown"
+
+        elapsed_ms = int((perf_counter() - start) * 1000)
+
         upsert_transcript(
             db,
             segment_id=UUID(segment_id),
@@ -86,8 +97,10 @@ def transcribe_segment(self, segment_id: str, segment_started_at_iso: str) -> di
             language="ar",
             confidence=confidence,
             model_name=settings.model_name,
+            model_version=model_version,
+            processing_time_ms=elapsed_ms,
         )
 
-    return {"ok": True, "elapsed_ms": int((perf_counter() - start) * 1000)}
+    return {"ok": True, "elapsed_ms": elapsed_ms}
 
 

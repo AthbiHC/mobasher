@@ -70,6 +70,11 @@ class Recording(Base):
         DateTime(timezone=True), 
         default=lambda: datetime.now(timezone.utc)
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
     
     # Composite primary key for TimescaleDB
     __table_args__ = (
@@ -105,6 +110,28 @@ class Segment(Base):
         DateTime(timezone=True), 
         default=lambda: datetime.now(timezone.utc)
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    # Pipeline processing fields (per-pipeline status and bookkeeping)
+    asr_status: Mapped[str] = mapped_column(
+        String,
+        CheckConstraint("asr_status IN ('pending','queued','processing','completed','failed')"),
+        default="pending",
+    )
+    asr_last_processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    asr_attempts: Mapped[int] = mapped_column(Integer, default=0)
+
+    vision_status: Mapped[str] = mapped_column(
+        String,
+        CheckConstraint("vision_status IN ('pending','queued','processing','completed','failed')"),
+        default="pending",
+    )
+    vision_last_processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    vision_attempts: Mapped[int] = mapped_column(Integer, default=0)
     
     # Composite primary key for TimescaleDB
     __table_args__ = (
@@ -136,6 +163,11 @@ class Transcript(Base):
         DateTime(timezone=True), 
         default=lambda: datetime.now(timezone.utc)
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
     
     __table_args__ = (
         PrimaryKeyConstraint("segment_id", "segment_started_at", name="pk_transcripts"),
@@ -159,6 +191,11 @@ class SegmentEmbedding(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 
         default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
     )
     
     __table_args__ = (
@@ -190,6 +227,11 @@ class VisualEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 
         default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
     )
     
     __table_args__ = (
