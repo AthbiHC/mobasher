@@ -64,11 +64,11 @@ def get_channel(db: Session, channel_id: str) -> Optional[Channel]:
     return db.get(Channel, channel_id)
 
 
-def list_channels(db: Session, *, active_only: bool = False, limit: int = 100) -> List[Channel]:
+def list_channels(db: Session, *, active_only: bool = False, limit: int = 100, offset: int = 0) -> List[Channel]:
     stmt: Select = select(Channel)
     if active_only:
         stmt = stmt.where(Channel.active.is_(True))
-    stmt = stmt.order_by(Channel.created_at.asc()).limit(limit)
+    stmt = stmt.order_by(Channel.created_at.asc()).offset(offset).limit(limit)
     return list(db.execute(stmt).scalars().all())
 
 
@@ -122,13 +122,17 @@ def list_recent_recordings(
     channel_id: Optional[str] = None,
     since: Optional[datetime] = None,
     limit: int = 50,
+    offset: int = 0,
+    status: Optional[str] = None,
 ) -> List[Recording]:
     stmt: Select = select(Recording)
     if channel_id:
         stmt = stmt.where(Recording.channel_id == channel_id)
     if since:
         stmt = stmt.where(Recording.started_at >= since)
-    stmt = stmt.order_by(desc(Recording.started_at)).limit(limit)
+    if status:
+        stmt = stmt.where(Recording.status == status)
+    stmt = stmt.order_by(desc(Recording.started_at)).offset(offset).limit(limit)
     return list(db.execute(stmt).scalars().all())
 
 
@@ -184,6 +188,8 @@ def list_segments(
     start: Optional[datetime] = None,
     end: Optional[datetime] = None,
     limit: int = 200,
+    offset: int = 0,
+    status: Optional[str] = None,
 ) -> List[Segment]:
     stmt: Select = select(Segment)
     if channel_id:
@@ -192,7 +198,9 @@ def list_segments(
         stmt = stmt.where(Segment.started_at >= start)
     if end:
         stmt = stmt.where(Segment.started_at < end)
-    stmt = stmt.order_by(desc(Segment.started_at)).limit(limit)
+    if status:
+        stmt = stmt.where(Segment.status == status)
+    stmt = stmt.order_by(desc(Segment.started_at)).offset(offset).limit(limit)
     return list(db.execute(stmt).scalars().all())
 
 

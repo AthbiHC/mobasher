@@ -152,6 +152,27 @@ def info_config() -> None:
     typer.echo("Config file support will be added in v1.1 (mediaview.yaml)")
 
 
+api_app = typer.Typer(help="API server")
+app.add_typer(api_app, name="api")
+
+
+@api_app.command("serve")
+def api_serve(
+    host: str = typer.Option("127.0.0.1", help="Bind host (defaults to localhost)"),
+    port: int = typer.Option(8000, help="Bind port"),
+    reload: bool = typer.Option(False, help="Auto-reload on code changes"),
+    public: bool = typer.Option(False, help="Bind to 0.0.0.0 (overrides host)"),
+) -> None:
+    import sys
+    # Use the same interpreter (venv) to ensure uvicorn runs within it
+    bind_host = "0.0.0.0" if public else host
+    cmd = f"{sys.executable} -m uvicorn mobasher.api.app:app --host {bind_host} --port {port}"
+    if reload:
+        cmd += " --reload"
+    code = _run(cmd, cwd=_repo_root())
+    raise typer.Exit(code)
+
+
 def main() -> None:
     app()
 
