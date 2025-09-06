@@ -27,6 +27,11 @@ class VisionSettings(BaseSettings):
     ocr_iou_threshold: float = 0.3
     ocr_text_sim_threshold: float = 0.6
     ocr_merge_window_s: float = 2.0
+    # Objects
+    objects_fps: float = 1.0
+    yolo_model: str = "yolov8n.pt"  # ultralytics model id or path
+    objects_conf_threshold: float = 0.35
+    objects_classes: Optional[List[str]] = None  # e.g., ["person", "car"]
 
 
 settings = VisionSettings()
@@ -47,6 +52,7 @@ def _sample_timestamps(duration_s: float, fps: float) -> List[float]:
 
 # Global OCR model cache
 _OCR = None
+_YOLO = None
 
 
 def _get_ocr():
@@ -55,6 +61,18 @@ def _get_ocr():
         import easyocr  # type: ignore
         _OCR = easyocr.Reader([settings.ocr_lang], gpu=False, verbose=False)
     return _OCR
+
+
+def _get_yolo():
+    global _YOLO
+    if _YOLO is not None:
+        return _YOLO
+    try:
+        from ultralytics import YOLO  # type: ignore
+        _YOLO = YOLO(settings.yolo_model)
+        return _YOLO
+    except Exception:
+        return None
 
 
 def _read_frame_at(video_path: str, ts_sec: float) -> Optional[Tuple[Any, int, int]]:
@@ -343,3 +361,92 @@ def ocr_segment(self, segment_id: str, segment_started_at_iso: str) -> Dict[str,
     return {"ok": True, "events": events, "elapsed_ms": int((perf_counter() - start) * 1000)}
 
 
+@app.task(name="vision.objects_segment", bind=True, max_retries=2, default_retry_delay=10)
+def objects_segment(self, segment_id: str, segment_started_at_iso: str) -> Dict[str, Any]:
+    start = perf_counter()
+    from datetime import datetime
+    from uuid import UUID
+    from mobasher.storage.db import get_session, init_engine
+    from mobasher.storage.models import Segment, VisualEvent
+    import subprocess
+    import os
+
+    init_engine()
+    with next(get_session()) as db:  # type: ignore
+        seg = db.get(Segment, (UUID(segment_id), datetime.fromisoformat(segment_started_at_iso)))
+        if seg is None or not seg.video_path:
+            raise self.retry(exc=RuntimeError("segment_missing_or_no_video"))
+
+        # Probe duration
+        try:
+            result = subprocess.run([
+                'ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nokey=1:noprint_wrappers=1', seg.video_path
+            ], capture_output=True, text=True)
+            duration_s = float(result.stdout.strip()) if result.returncode == 0 else 60.0
+        except Exception:
+            duration_s = 60.0
+
+        timestamps = _sample_timestamps(duration_s, settings.objects_fps)
+        yolo = _get_yolo()
+        events = 0
+        screenshot_root = os.environ.get('MOBASHER_SCREENSHOT_ROOT', '/Volumes/ExternalDB/Media-View-Data/data/screenshot')
+        os.makedirs(screenshot_root, exist_ok=True)
+
+        for idx, ts in enumerate(timestamps):
+            fr = _read_frame_at(seg.video_path, ts)
+            if fr is None:
+                continue
+            frame, w, h = fr
+            detections = []
+            if yolo is not None:
+                try:
+                    results = yolo.predict(source=frame, verbose=False, conf=settings.objects_conf_threshold, imgsz=max(w, h))
+                    for r in results:
+                        # r.boxes.xywh, r.boxes.conf, r.names
+                        names = r.names
+                        for b in r.boxes:
+                            cls_id = int(b.cls.item()) if hasattr(b, 'cls') else None
+                            label = names.get(cls_id, str(cls_id)) if cls_id is not None else 'obj'
+                            if settings.objects_classes and label not in settings.objects_classes:
+                                continue
+                            x1, y1, x2, y2 = b.xyxy[0].tolist()
+                            conf = float(b.conf.item()) if hasattr(b, 'conf') else None
+                            detections.append({
+                                'label': label,
+                                'bbox': [int(x1), int(y1), int(max(1, x2 - x1)), int(max(1, y2 - y1))],
+                                'conf': conf,
+                            })
+                except Exception:
+                    pass
+
+            # Save one screenshot per timestamp for QC
+            fname = os.path.basename(seg.video_path)
+            base, _ = os.path.splitext(fname)
+            shot_name = f"{base}-seg_{idx}_objects.jpg"
+            shot_path = os.path.join(screenshot_root, shot_name)
+            try:
+                import cv2
+                cv2.imwrite(shot_path, frame)
+            except Exception:
+                pass
+
+            for det in detections:
+                ve = VisualEvent(
+                    id=None,
+                    segment_id=UUID(segment_id),
+                    segment_started_at=datetime.fromisoformat(segment_started_at_iso),
+                    channel_id=seg.channel_id,
+                    timestamp_offset=float(ts),
+                    event_type='object',
+                    bbox=det['bbox'],
+                    confidence=det['conf'],
+                    data={'class': det['label']},
+                    video_path=seg.video_path,
+                    video_filename=fname,
+                    screenshot_path=shot_path,
+                    frame_timestamp_ms=int(ts*1000),
+                )
+                db.add(ve)
+                events += 1
+        db.commit()
+    return {"ok": True, "events": events, "elapsed_ms": int((perf_counter() - start) * 1000)}
