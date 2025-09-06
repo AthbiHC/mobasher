@@ -40,3 +40,7 @@ This document tracks noteworthy changes, fixes, and operational learnings. Keep 
 ## 2025-09-06T00:00:05Z
 - CLI: run Celery via current Python interpreter to avoid PATH issues
 - Docs: clarify worker concurrency flags and device caveats (no 'metal' device)
+
+## 2025-09-06T00:00:06Z
+- Vision: add OCR worker (EasyOCR) and enqueue command, initial 1 fps → 3 fps
+- Vision: frame sampling via OpenCV; events persisted to `visual_events`
