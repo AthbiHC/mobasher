@@ -103,6 +103,7 @@ alembic upgrade head
 - **[TODO List](docs/TODO.md)** - Current priorities and development roadmap
 - **[Change Log](docs/CHANGES-LOG.md)** - Chronological list of changes and fixes
 - **[API](docs/API.md)** - Endpoints and usage examples
+- **[Phases](docs/PHASES.md)** - Detailed development phases and acceptance criteria
 
 ## Development Workflow
 ### Run recorder (recommended via CLI)
