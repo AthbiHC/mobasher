@@ -43,16 +43,28 @@ def run(
     word_ts: bool = typer.Option(False, help="Enable word timestamps"),
     language: str = typer.Option("ar", help="Transcription language"),
     device: Optional[str] = typer.Option(None, help="Device override: cpu|cuda|mps"),
+    refs: Optional[List[str]] = typer.Option(None, help="Reference transcripts (same order as --path) for WER/CER"),
 ) -> None:
     model_names = [m.strip() for m in models.split(",") if m.strip()]
     for mname in model_names:
         typer.echo(f"\n=== Model: {mname} | beam={beam} | vad={int(vad)} | word_ts={int(word_ts)} | lang={language} ===")
         model = _load_model(mname, device)
-        for p in path:
+        for i, p in enumerate(path):
             t0 = perf_counter()
             text, avg_conf = _transcribe_one(model, p, beam=beam, vad=vad, word_ts=word_ts, language=language)
             dt = int((perf_counter() - t0) * 1000)
-            typer.echo(f"\n--- File: {p}\nms={dt} avg_conf={avg_conf} \n{text}\n")
+            wer = cer = None
+            if refs and i < len(refs) and refs[i]:
+                try:
+                    from jiwer import wer as _wer, cer as _cer  # type: ignore
+                    wer = _wer(refs[i], text)
+                    cer = _cer(refs[i], text)
+                except Exception:
+                    pass
+            metrics = f"ms={dt} avg_conf={avg_conf}"
+            if wer is not None:
+                metrics += f" wer={wer:.3f} cer={cer:.3f}"
+            typer.echo(f"\n--- File: {p}\n{metrics}\n{text}\n")
 
 
 def main() -> None:

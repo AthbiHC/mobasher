@@ -218,6 +218,7 @@ def upsert_transcript(
     model_version: Optional[str] = None,
     words: Optional[list] = None,
     processing_time_ms: Optional[int] = None,
+    engine_time_ms: Optional[int] = None,
 ) -> Transcript:
     tr = db.get(Transcript, (segment_id, segment_started_at))
     if tr is None:
@@ -231,6 +232,7 @@ def upsert_transcript(
             model_name=model_name,
             model_version=model_version,
             processing_time_ms=processing_time_ms,
+            engine_time_ms=engine_time_ms,
         )
         db.add(tr)
     else:
@@ -241,6 +243,7 @@ def upsert_transcript(
         tr.model_version = model_version
         tr.words = words
         tr.processing_time_ms = processing_time_ms
+        tr.engine_time_ms = engine_time_ms
         db.add(tr)
     db.commit()
     db.refresh(tr)

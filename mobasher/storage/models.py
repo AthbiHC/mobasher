@@ -154,11 +154,16 @@ class Transcript(Base):
     segment_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     language: Mapped[str] = mapped_column(String, default="ar")
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    # Optional normalized text for search (diacritics/tatweel removed, digit normalized)
+    text_norm: Mapped[Optional[str]] = mapped_column(Text)
     words: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON)  # Word-level timestamps
     confidence: Mapped[Optional[float]] = mapped_column(Float)
     model_name: Mapped[str] = mapped_column(String, nullable=False)
     model_version: Mapped[Optional[str]] = mapped_column(String)
+    # Total task wall-clock
     processing_time_ms: Mapped[Optional[int]] = mapped_column(Integer)
+    # Engine-only compute time around model.transcribe
+    engine_time_ms: Mapped[Optional[int]] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 
         default=lambda: datetime.now(timezone.utc)

@@ -15,6 +15,8 @@ class ASRSettings(BaseSettings):
     beam_size: int = int(os.environ.get("ASR_BEAM", "5"))
     vad_enabled: bool = bool(int(os.environ.get("ASR_VAD", "1")))
     word_timestamps: bool = bool(int(os.environ.get("ASR_WORD_TS", "1")))
+    condition_on_previous: bool = bool(int(os.environ.get("ASR_COND_PREV", "0")))
+    initial_prompt: Optional[str] = os.environ.get("ASR_INITIAL_PROMPT")
 
 
 settings = ASRSettings()
@@ -61,13 +63,17 @@ def transcribe_segment(self, segment_id: str, segment_started_at_iso: str) -> di
             model = _get_model()
         except Exception as e:
             raise self.retry(exc=e)
+        engine_t0 = perf_counter()
         segments, info = model.transcribe(
             seg.audio_path,
             beam_size=settings.beam_size,
             vad_filter=settings.vad_enabled,
             word_timestamps=settings.word_timestamps,
             language="ar",
+            condition_on_previous_text=settings.condition_on_previous,
+            initial_prompt=settings.initial_prompt,
         )
+        engine_time_ms = int((perf_counter() - engine_t0) * 1000)
         # Collect text and compute a simple average confidence if present
         texts = []
         confidences = []
@@ -99,7 +105,31 @@ def transcribe_segment(self, segment_id: str, segment_started_at_iso: str) -> di
             model_name=settings.model_name,
             model_version=model_version,
             processing_time_ms=elapsed_ms,
+            engine_time_ms=engine_time_ms,
+            words=[{
+                "start": getattr(s, "start", None),
+                "end": getattr(s, "end", None),
+                "text": s.text,
+            } for s in segments] if settings.word_timestamps else None,
+            # text_norm computed below
         )
+
+        # Normalize Arabic text optionally and persist
+        try:
+            from camel_tools.utils.normalize import normalize_arabic  # type: ignore
+            def _norm(t: str) -> str:
+                return normalize_arabic(t, alef=True, yah=True, ta=True)
+        except Exception:
+            def _norm(t: str) -> str:
+                return t
+
+        from mobasher.storage.models import Transcript
+        tr = db.get(Transcript, (UUID(segment_id), datetime.fromisoformat(segment_started_at_iso)))
+        if tr is not None:
+            tr.text_norm = _norm(text)
+            tr.engine_time_ms = engine_time_ms
+            db.add(tr)
+            db.commit()
 
     return {"ok": True, "elapsed_ms": elapsed_ms}
 
