@@ -12,4 +12,15 @@
       - Video 720p: …/manifest/video/720p1750kbps/video.m3u8
       - Audio 96kbps: …/manifest/audio/96kbps/audio.m3u8
 
+- Name: Al Jazeera Arabic (Qatar)
+  - URL: https://www.elahmad.com/tv/mobiletv/glarb.php?id=aljazeer_ar1
+  - Official: https://www.aljazeera.net/
+  - Type: News
+  - Notes: International Arabic news channel.
+  - Streams:
+    - Master HLS: https://live-hls-web-aja-fa.thehlive.com/AJA/index.m3u8
+    - Alternatives:
+      - https://live-hls-web-aja-fa.thehlive.com/alternative/AJA/04.m3u8
+      - https://live-hls-web-aja-fa.thehlive.com/alternative/AJA/02.m3u8
+
 
