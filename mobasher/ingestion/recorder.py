@@ -3,7 +3,7 @@ Mobasher Dual HLS Recorder (start-only filenames)
 
 - 60s processing segments for audio + video
 - 1h archive segments for viewing
-- Start-only filenames: kuwait1-YYYYMMDD-HHMMSS.{wav|mp4}
+- Start-only filenames: <channel_id>-YYYYMMDD-HHMMSS.{wav|mp4}
 - Zero-duration/partial file guard
 """
 
@@ -617,7 +617,7 @@ def load_channel_config(config_path: str) -> Dict[str, Any]:
 
 async def main():
     parser = argparse.ArgumentParser(description='Mobasher Dual HLS Recorder')
-    parser.add_argument('--config', default='../channels/kuwait1.yaml', help='Path to channel YAML config')
+    parser.add_argument('--config', required=True, help='Path to channel YAML config')
     parser.add_argument(
         '--data-root',
         default=os.environ.get('MOBASHER_DATA_ROOT', '../data'),

@@ -48,11 +48,31 @@ storage:
 ./scripts/mediaview recorder logs -f
 ```
 
+### Archive recorder (separate process)
+```bash
+# Copy mode (preferred when stream is MP4-compatible):
+./scripts/mediaview archive start --config mobasher/channels/kuwait1.yaml --mode copy --metrics-port 9120 \
+  --data-root /Volumes/ExternalDB/Media-View-Data/data
+
+# Encode mode (forces perfect hour cuts via keyframes):
+./scripts/mediaview archive start --config mobasher/channels/kuwait1.yaml --mode encode --metrics-port 9121
+
+# Stop/status
+./scripts/mediaview archive status
+./scripts/mediaview archive stop
+```
+
 ### Metrics
 - `mobasher_recorder_running{channel_id}` gauge
 - `mobasher_recorder_segments_total{channel_id,media_type}` counter
 - `mobasher_recorder_heartbeats_total{channel_id}` counter
 - `mobasher_recorder_collect_duration_seconds{channel_id}` histogram
+
+Archive recorder metrics:
+- `mobasher_archive_running{channel_id}` gauge
+- `mobasher_archive_segments_total{channel_id}` counter
+- `mobasher_archive_thumbnails_total{channel_id}` counter
+- `mobasher_archive_last_cut_timestamp{channel_id}` gauge
 
 ### Failure modes & recovery
 - Network hiccups: FFmpeg `-reconnect` options enabled

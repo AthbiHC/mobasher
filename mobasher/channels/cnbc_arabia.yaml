@@ -1,0 +1,22 @@
+id: cnbc_arabia
+name: CNBC Arabia
+input:
+  url: https://cnbc-live.akamaized.net/cnbc/master.m3u8
+  headers:
+    User-Agent: Mobasher/1.0
+recording:
+  segment_seconds: 60
+  video_enabled: true
+  audio_enabled: true
+video:
+  encoder: h264_videotoolbox
+  preset: realtime
+  threads: 2
+  qualities:
+    "720p": { resolution: "1280x720", bitrate: "2500k", fps: 25 }
+storage:
+  date_folders: true
+  channel_subdir: true
+  directories: { audio: audio, video: video, archive: archive }
+
+

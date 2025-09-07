@@ -16,6 +16,8 @@ This document catalogs common commands and workflows for developing, running, an
   - ASR enqueue: `./scripts/mediaview asr enqueue --channel-id kuwait_news --since 2025-09-05T00:00:00Z --limit 50`
   - ASR scheduler: `./scripts/mediaview asr scheduler --interval 30 --lookback 10`
   - Truncate DB: `./scripts/mediaview db truncate --yes`
+  - Fresh reset: `./scripts/mediaview freshreset --yes [--today-only] [--data-root /path/to/data]`
+  - Kill all processes: `./scripts/mediaview kill-the-minions`
   - Reset vision artifacts (manual): truncate `visual_events` and delete screenshots under `${MOBASHER_SCREENSHOT_ROOT:-/Volumes/ExternalDB/Media-View-Data/data/screenshot}`.
   - Retention: `./scripts/mediaview db retention --dry-run`
 
@@ -86,6 +88,17 @@ nohup python recorder.py --config ../channels/kuwait1.yaml --data-root ${MOBASHE
 - Stop recorder (preferred):
 ```bash
 ./scripts/mediaview recorder stop
+```
+
+- Archive recorder (hour-aligned):
+```bash
+# Start archive (copy mode) writing to data/archive/<channel>/<YYYY-MM-DD>/
+./scripts/mediaview archive start --config mobasher/channels/kuwait1.yaml --mode copy --metrics-port 9120 \
+  --data-root /Volumes/ExternalDB/Media-View-Data/data
+
+# Stop/status
+./scripts/mediaview archive status
+./scripts/mediaview archive stop
 ```
 
 - Manual stop (fallback):

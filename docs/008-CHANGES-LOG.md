@@ -14,6 +14,7 @@ This document tracks noteworthy changes, fixes, and operational learnings. Keep 
 - CPU usage reduction: default hardware encoder on macOS (`h264_videotoolbox`), configurable `video.encoder/preset/threads`
 - CLI stop improvement: `mediaview recorder stop` also kills lingering ffmpeg matching `Mobasher/1.0` UA
 - Docs synced: README, COMMANDS, Main-Document updated; sample `kuwait1.yaml` adjusted
+2025-09-07T19:05:00Z: Added archive recorder (hour-aligned, copy/encode) with thumbnail hook; new CLI commands `archive start|stop|status`, `freshreset`, and `kill-the-minions`. Improved `recorder stop` to close metrics and ffmpeg.
 
 ## 2025-09-06T00:00:01Z
 - Phase 1 API: added FastAPI app with `/health`, `/channels`, `/recordings`, `/segments`

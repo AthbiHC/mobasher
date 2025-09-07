@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import typer
 
@@ -60,11 +60,15 @@ def recorder_status() -> None:
 
 
 @recorder_app.command("stop")
-def recorder_stop(force: bool = typer.Option(True, help="Also kill lingering ffmpeg with Mobasher UA")) -> None:
-    rc = _run("pkill -f 'ingestion/recorder.py' || true", cwd=_repo_root())
+def recorder_stop(force: bool = typer.Option(True, help="Also kill lingering ffmpeg and metrics ports")) -> None:
+    root = _repo_root()
+    rc = _run("pkill -f 'ingestion/recorder.py' || true", cwd=root)
     if force:
-        # Terminate any ffmpeg processes started by our recorder (identified by UA)
-        _run("pkill -f \"ffmpeg.*Mobasher/1.0\" || true", cwd=_repo_root())
+        # Kill ffmpeg processes launched by our recorder (User-Agent marker)
+        _run("pkill -f \"ffmpeg.*Mobasher/1.0\" || true", cwd=root)
+        # Close common recorder metrics ports (multi-channel ready)
+        for port in (9108, 9109, 9110, 9111, 9112):
+            _run(f"PID=$(lsof -tiTCP:{port} -sTCP:LISTEN || true); [ -n \"$PID\" ] && kill -KILL $PID || true", cwd=root)
     raise typer.Exit(rc)
 
 
@@ -84,8 +88,9 @@ def db_truncate(include_channels: bool = typer.Option(False), yes: bool = typer.
     if not yes:
         typer.echo("Refusing to run without --yes")
         raise typer.Exit(2)
+    import sys
     inc = " --include-channels" if include_channels else ""
-    code = _run(f"python -m mobasher.storage.truncate_db --yes{inc}")
+    code = _run(f"{sys.executable} -m mobasher.storage.truncate_db --yes{inc}")
     raise typer.Exit(code)
 
 
@@ -104,7 +109,7 @@ def db_retention(
         "python -m mobasher.storage.retention_jobs"
         f"{flags} --retain-transcripts-days {transcripts_days} --retain-embeddings-days {embeddings_days}"
     )
-    code = _run(cmd)
+    code = _run(cmd, cwd=_repo_root())
     raise typer.Exit(code)
 
 
@@ -180,10 +185,6 @@ def api_serve(
         cmd += " --reload"
     code = _run(cmd, cwd=_repo_root())
     raise typer.Exit(code)
-
-
-def main() -> None:
-    app()
 
 
 asr_app = typer.Typer(help="ASR pipeline")
@@ -272,6 +273,159 @@ def vision_enqueue(limit: int = typer.Option(20, help="How many segments to enqu
         cwd=_repo_root(),
     )
     raise typer.Exit(code)
+
+
+# Archive recorder commands
+archive_app = typer.Typer(help="Archive recorder (hour-aligned)")
+app.add_typer(archive_app, name="archive")
+
+
+@archive_app.command("start")
+def archive_start(
+    config: str = typer.Option(..., help="Path to channel YAML"),
+    data_root: Optional[str] = typer.Option(None, help="Data root (overrides MOBASHER_DATA_ROOT)"),
+    mode: str = typer.Option("copy", help="copy|encode"),
+    quality: str = typer.Option("720p"),
+    thumbs: bool = typer.Option(True, help="Create thumbnails per archive file"),
+    metrics_port: int = typer.Option(9120, help="Metrics port"),
+    daemon: bool = typer.Option(True, help="Run in background via nohup"),
+) -> None:
+    import sys
+    env = os.environ.copy()
+    cfg_path = config
+    if not os.path.isabs(cfg_path):
+        cfg_path = str((_repo_root() / cfg_path).resolve())
+    if data_root:
+        env["MOBASHER_DATA_ROOT"] = data_root
+    thumb_flag = "--thumbs" if thumbs else "--no-thumbs"
+    data_flag = f" --data-root {data_root}" if data_root else ""
+    base = (
+        f"{sys.executable} archive_recorder.py --config {cfg_path}{data_flag} "
+        f"--mode {mode} --quality {quality} {thumb_flag} --metrics-port {metrics_port}"
+    )
+    cmd = f"nohup {base} > archive_{Path(cfg_path).stem}.log 2>&1 &" if daemon else base
+    typer.echo(f"Executing: {cmd}")
+    code = _run(cmd, cwd=_repo_root() / "mobasher/ingestion")
+    raise typer.Exit(code)
+
+
+@archive_app.command("status")
+def archive_status() -> None:
+    code = _run("pgrep -af 'ingestion/archive_recorder.py' || echo 'Archive not running'", cwd=_repo_root())
+    raise typer.Exit(code)
+
+
+@archive_app.command("stop")
+def archive_stop() -> None:
+    root = _repo_root()
+    _run("pkill -f 'ingestion/archive_recorder.py' || true", cwd=root)
+    # close default metrics port if stuck
+    for port in (9120, 9121, 9122):
+        _run(f"PID=$(lsof -tiTCP:{port} -sTCP:LISTEN || true); [ -n \"$PID\" ] && kill -KILL $PID || true", cwd=root)
+    raise typer.Exit(0)
+
+# Fresh reset (renamed to single word) and kill commands
+
+
+def _kill_processes() -> None:
+    """Stop recorder/ffmpeg and workers; close known metrics ports."""
+    root = _repo_root()
+    _run("pkill -f 'ingestion/recorder.py' || true", cwd=root)
+    _run("pkill -f \"ffmpeg.*Mobasher/1.0\" || true", cwd=root)
+    _run("pkill -f \"ffmpeg.*Media-View/mobasher/data/\" || true", cwd=root)
+    _run("pkill -f 'celery.*mobasher.asr.worker' || true", cwd=root)
+    _run("pkill -f 'celery.*mobasher.vision.worker' || true", cwd=root)
+    for port in (9108, 9109, 9110):
+        _run(f"PID=$(lsof -tiTCP:{port} -sTCP:LISTEN || true); [ -n \"$PID\" ] && kill -KILL $PID || true", cwd=root)
+
+
+def _wipe_data_roots(extra_root: Optional[str], today_only: bool) -> None:
+    import shutil
+    import re as _re
+    from datetime import datetime, timezone
+
+    roots: List[Path] = []
+    root = _repo_root()
+    roots.append(root / "mobasher" / "data")
+    roots.append(root / "data")
+    env_root = os.environ.get("MOBASHER_DATA_ROOT")
+    if extra_root:
+        env_root = extra_root
+    if env_root:
+        roots.append(Path(env_root))
+
+    def _safe(root_path: Path) -> bool:
+        try:
+            return root_path.exists() and root_path.is_dir() and root_path.name.lower() == "data"
+        except Exception:
+            return False
+
+    channel_like = _re.compile(r"^(al_|sky|cnbc|kuwait|mbc|aj|[a-z0-9_\-]+)$", _re.IGNORECASE)
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    for dr in roots:
+        if not _safe(dr):
+            continue
+        for p in dr.iterdir():
+            try:
+                if p.is_dir():
+                    if today_only:
+                        # Only remove today's dated subfolders under any channel or media dir
+                        if _re.match(r"^\d{4}-\d{2}-\d{2}$", p.name) and p.name == today:
+                            shutil.rmtree(p, ignore_errors=True)
+                    else:
+                        if channel_like.match(p.name) or p.name in {"audio", "video", "screenshots", "gallery"} or _re.match(r"^\d{4}-\d{2}-\d{2}$", p.name):
+                            shutil.rmtree(p, ignore_errors=True)
+                else:
+                    if not today_only and p.suffix.lower() in {".wav", ".mp4", ".mkv", ".jpg", ".jpeg", ".json", ".jsonl"}:
+                        try:
+                            p.unlink()
+                        except Exception:
+                            pass
+            except FileNotFoundError:
+                pass
+
+
+@app.command("freshreset")
+def fresh_reset(
+    include_channels: bool = typer.Option(False, help="Also truncate channels table"),
+    yes: bool = typer.Option(False, help="Confirm reset (required)"),
+    data_root: Optional[str] = typer.Option(None, help="Override MOBASHER_DATA_ROOT for wiping"),
+    today_only: bool = typer.Option(False, help="Only wipe today's folders (YYYY-MM-DD)"),
+) -> None:
+    """Stop processes, truncate DB, and wipe data directories."""
+    if not yes:
+        typer.echo("Refusing to run without --yes")
+        raise typer.Exit(2)
+    typer.echo("Stopping recorder/workers and closing metrics ports…")
+    _kill_processes()
+    typer.echo("Truncating database tables…")
+    import sys
+    inc = " --include-channels" if include_channels else ""
+    rc = _run(f"{sys.executable} -m mobasher.storage.truncate_db --yes{inc}")
+    if rc != 0:
+        raise typer.Exit(rc)
+    typer.echo("Wiping data directories…")
+    _wipe_data_roots(data_root, today_only)
+    typer.echo("Fresh reset completed.")
+
+
+@app.command("kill-the-minions")
+def kill_the_minions() -> None:
+    """Kill all Mobasher-related processes (recorder, ffmpeg, ASR, vision, metrics)."""
+    _kill_processes()
+    typer.echo("All minions are terminated.")
+
+
+# Backward-compatible alias
+@app.command("kill-minions")
+def kill_minions_alias() -> None:
+    _kill_processes()
+    typer.echo("All minions are terminated.")
+
+
+def main() -> None:
+    app()
 
 
 if __name__ == "__main__":
