@@ -66,7 +66,8 @@ class DualHLSRecorder:
         self.audio_enabled = bool(rec.get('audio_enabled', True))
         self.video_quality = rec.get('video_quality', '720p')
 
-        self.archive_enabled = bool(rec.get('archive_enabled', True))
+        # Temporarily disable archive in this recorder; a dedicated archiver will be built separately
+        self.archive_enabled = False
         self.archive_segment_seconds = int(rec.get('archive_segment_seconds', 3600))
         self.archive_quality = rec.get('archive_quality', '1080p')
 
