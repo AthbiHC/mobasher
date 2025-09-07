@@ -1,0 +1,40 @@
+{
+  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard"}]},
+  "editable": true,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {"type": "stat", "title": "API Requests (1m)", "id": 1, "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0},
+     "targets": [{"refId": "A", "expr": "sum(rate(mobasher_api_requests_total[1m]))"}],
+     "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto"}},
+    {"type": "stat", "title": "Recorder Heartbeats (5m)", "id": 2, "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0},
+     "targets": [{"refId": "A", "expr": "sum(increase(mobasher_recorder_heartbeats_total[5m]))"}],
+     "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}},
+    {"type": "timeseries", "title": "Segments/s by Type", "id": 3, "gridPos": {"h": 7, "w": 24, "x": 0, "y": 6},
+     "targets": [{"refId": "A", "expr": "sum by (media_type) (rate(mobasher_recorder_segments_total[5m]))"}]},
+    {"type": "timeseries", "title": "API Latency (p50/p90)", "id": 4, "gridPos": {"h": 6, "w": 24, "x": 0, "y": 13},
+     "targets": [
+       {"refId": "A", "expr": "histogram_quantile(0.5, sum(rate(mobasher_api_request_duration_seconds_bucket[5m])) by (le))"},
+       {"refId": "B", "expr": "histogram_quantile(0.9, sum(rate(mobasher_api_request_duration_seconds_bucket[5m])) by (le))"}
+     ]},
+    {"type": "stat", "title": "ASR Tasks/s (1m)", "id": 5, "gridPos": {"h": 5, "w": 8, "x": 0, "y": 19},
+     "targets": [{"refId": "A", "expr": "sum(rate(asr_task_attempts_total{task=\"transcribe_segment\"}[1m]))"}]},
+    {"type": "timeseries", "title": "ASR Duration (p50/p90)", "id": 6, "gridPos": {"h": 6, "w": 24, "x": 0, "y": 24},
+     "targets": [
+       {"refId": "A", "expr": "histogram_quantile(0.5, sum(rate(asr_task_duration_seconds_bucket{task=\"transcribe_segment\"}[5m])) by (le))"},
+       {"refId": "B", "expr": "histogram_quantile(0.9, sum(rate(asr_task_duration_seconds_bucket{task=\"transcribe_segment\"}[5m])) by (le))"}
+     ]}
+  ],
+  "refresh": "10s",
+  "schemaVersion": 41,
+  "tags": ["mobasher", "v2"],
+  "templating": {"list": [
+    {"name": "channel", "type": "query", "datasource": {"type": "prometheus", "uid": "Prometheus"},
+     "query": "label_values(mobasher_recorder_running, channel_id)", "refresh": 2, "hide": 0}
+  ]},
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "browser",
+  "title": "Mobasher v2 Overview",
+  "version": 1
+}
