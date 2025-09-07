@@ -34,4 +34,15 @@
       - https://shls-live-enc.edgenextcdn.net/out/v1/f5f319206ed740f9a831f2097c2ead23/index_33.m3u8
       - https://shls-live-enc.edgenextcdn.net/out/v1/f5f319206ed740f9a831f2097c2ead23/index_37.m3u8
 
+- Name: Sky News Arabia (UAE)
+  - URL: https://www.elahmad.com/tv/arabic-tv-online.php?id=skynews
+  - Official: https://www.skynewsarabia.com/
+  - Type: News
+  - Notes: Arabic 24/7 news channel.
+  - Streams:
+    - Master (tokenized example): https://stream.skynewsarabia.com/hls/sna.m3u8?user=...&session=...
+    - Variants (stable):
+      - https://stream.skynewsarabia.com/hls/sna_720.m3u8
+      - https://stream.skynewsarabia.com/hls/sna_480.m3u8
+
 
