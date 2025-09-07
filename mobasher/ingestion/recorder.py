@@ -106,6 +106,7 @@ class DualHLSRecorder:
         self.archive_quality = rec.get('archive_quality', '1080p')
 
         self.date_folders = bool(storage.get('date_folders', True))
+        self.channel_subdir = bool(storage.get('channel_subdir', True))
         self.directories = storage.get('directories', {'audio': 'audio', 'video': 'video', 'archive': 'archive'})
 
         self.sample_rate = int(audio.get('sample_rate', 16000))
@@ -125,14 +126,15 @@ class DualHLSRecorder:
     def _create_directories(self):
         """Compute folder paths and ensure they exist."""
         today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        base = self.data_root / self.channel_id if self.channel_subdir else self.data_root
         if self.date_folders:
-            self.audio_dir = self.data_root / self.directories['audio'] / today
-            self.video_dir = self.data_root / self.directories['video'] / today
-            self.archive_dir = self.data_root / self.directories['archive'] / today
+            self.audio_dir = base / self.directories['audio'] / today
+            self.video_dir = base / self.directories['video'] / today
+            self.archive_dir = base / self.directories['archive'] / today
         else:
-            self.audio_dir = self.data_root / self.directories['audio'] / self.channel_id
-            self.video_dir = self.data_root / self.directories['video'] / self.channel_id
-            self.archive_dir = self.data_root / self.directories['archive'] / self.channel_id
+            self.audio_dir = base / self.directories['audio']
+            self.video_dir = base / self.directories['video']
+            self.archive_dir = base / self.directories['archive']
         self._ensure_dirs()
 
     def _ensure_dirs(self):

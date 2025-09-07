@@ -32,13 +32,13 @@ _MODEL = None
 
 # Prometheus metrics (process-local)
 ASR_TASK_ATTEMPTS = Counter(
-    "asr_task_attempts_total", "Total task attempts", ["task"],
+    "asr_task_attempts_total", "Total task attempts", ["task", "channel_id"],
 )
 ASR_TASK_OUTCOMES = Counter(
-    "asr_task_outcomes_total", "Task outcomes by status", ["task", "outcome"],
+    "asr_task_outcomes_total", "Task outcomes by status", ["task", "outcome", "channel_id"],
 )
 ASR_TASK_DURATION = Histogram(
-    "asr_task_duration_seconds", "Task duration in seconds", ["task"],
+    "asr_task_duration_seconds", "Task duration in seconds", ["task", "channel_id"],
     buckets=(0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 120),
 )
 
@@ -100,7 +100,6 @@ def ping() -> str:
 @app.task(name="asr.transcribe_segment", bind=True, max_retries=3, default_retry_delay=10)
 def transcribe_segment(self, segment_id: str, segment_started_at_iso: str) -> dict:
     start = perf_counter()
-    ASR_TASK_ATTEMPTS.labels(task="transcribe_segment").inc()
     # Lazy import heavy deps inside task
     from datetime import datetime
     from uuid import UUID
@@ -115,8 +114,11 @@ def transcribe_segment(self, segment_id: str, segment_started_at_iso: str) -> di
                 try:
                     raise RuntimeError("segment_missing_or_no_audio")
                 except Exception as e:
-                    ASR_TASK_OUTCOMES.labels(task="transcribe_segment", outcome="retry").inc()
+                    ASR_TASK_OUTCOMES.labels(task="transcribe_segment", outcome="retry", channel_id=getattr(seg, "channel_id", "unknown")).inc()
                     raise self.retry(exc=e)
+
+            # increment attempts once we know channel_id
+            ASR_TASK_ATTEMPTS.labels(task="transcribe_segment", channel_id=seg.channel_id).inc()
 
             # Resolve audio path to absolute if needed
             audio_path = _resolve_audio_path(seg.audio_path)
@@ -125,7 +127,7 @@ def transcribe_segment(self, segment_id: str, segment_started_at_iso: str) -> di
             try:
                 model = _get_model()
             except Exception as e:
-                ASR_TASK_OUTCOMES.labels(task="transcribe_segment", outcome="retry").inc()
+                ASR_TASK_OUTCOMES.labels(task="transcribe_segment", outcome="retry", channel_id=seg.channel_id).inc()
                 raise self.retry(exc=e)
             engine_t0 = perf_counter()
             segments, info = model.transcribe(
@@ -196,11 +198,16 @@ def transcribe_segment(self, segment_id: str, segment_started_at_iso: str) -> di
                 db.commit()
 
         # success metrics
-        ASR_TASK_OUTCOMES.labels(task="transcribe_segment", outcome="success").inc()
-        ASR_TASK_DURATION.labels(task="transcribe_segment").observe(elapsed_ms / 1000.0)
+        ASR_TASK_OUTCOMES.labels(task="transcribe_segment", outcome="success", channel_id=seg.channel_id).inc()
+        ASR_TASK_DURATION.labels(task="transcribe_segment", channel_id=seg.channel_id).observe(elapsed_ms / 1000.0)
         return {"ok": True, "elapsed_ms": elapsed_ms}
     except Exception:
-        ASR_TASK_OUTCOMES.labels(task="transcribe_segment", outcome="error").inc()
+        # channel_id might be unknown if failure occurred before seg fetched
+        try:
+            ch = seg.channel_id  # type: ignore[name-defined]
+        except Exception:
+            ch = "unknown"
+        ASR_TASK_OUTCOMES.labels(task="transcribe_segment", outcome="error", channel_id=ch).inc()
         raise
 
 

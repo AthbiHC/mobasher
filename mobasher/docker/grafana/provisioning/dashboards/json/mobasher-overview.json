@@ -123,7 +123,7 @@
       "pluginVersion": "12.1.1",
       "targets": [
         {
-          "expr": "sum(rate(mobasher_recorder_heartbeats_total[1m]))",
+          "expr": "sum(rate(mobasher_recorder_heartbeats_total{channel_id=~\"$channel\"}[1m]))",
           "legendFormat": "hb/s (1m)",
           "refId": "A"
         }
@@ -178,7 +178,7 @@
       "pluginVersion": "12.1.1",
       "targets": [
         {
-          "expr": "max(time() - mobasher_recorder_last_heartbeat_seconds)",
+          "expr": "max(time() - mobasher_recorder_last_heartbeat_seconds{channel_id=~\"$channel\"})",
           "legendFormat": "age(s)",
           "refId": "A"
         }
@@ -265,7 +265,7 @@
       "pluginVersion": "12.1.1",
       "targets": [
         {
-          "expr": "sum by (media_type) (rate(mobasher_recorder_segments_total[5m]))",
+          "expr": "sum by (media_type) (rate(mobasher_recorder_segments_total{channel_id=~\"$channel\"}[5m]))",
           "legendFormat": "{{media_type}}",
           "refId": "A"
         }
@@ -412,7 +412,7 @@
       "pluginVersion": "12.1.1",
       "targets": [
         {
-          "expr": "sum(rate(asr_task_attempts_total{task=\"transcribe_segment\"}[1m]))",
+          "expr": "sum(rate(asr_task_attempts_total{task=\"transcribe_segment\",channel_id=~\"$channel\"}[1m]))",
           "legendFormat": "attempts/s",
           "refId": "A"
         }
@@ -499,12 +499,12 @@
       "pluginVersion": "12.1.1",
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum(rate(asr_task_duration_seconds_bucket{task=\"transcribe_segment\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.5, sum(rate(asr_task_duration_seconds_bucket{task=\"transcribe_segment\",channel_id=~\"$channel\"}[5m])) by (le))",
           "legendFormat": "p50",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.9, sum(rate(asr_task_duration_seconds_bucket{task=\"transcribe_segment\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.9, sum(rate(asr_task_duration_seconds_bucket{task=\"transcribe_segment\",channel_id=~\"$channel\"}[5m])) by (le))",
           "legendFormat": "p90",
           "refId": "B"
         }
@@ -591,7 +591,7 @@
       "pluginVersion": "12.1.1",
       "targets": [
         {
-          "expr": "sum by (outcome) (rate(asr_task_outcomes_total{task=\"transcribe_segment\"}[5m]))",
+          "expr": "sum by (outcome) (rate(asr_task_outcomes_total{task=\"transcribe_segment\",channel_id=~\"$channel\"}[5m]))",
           "legendFormat": "{{outcome}}",
           "refId": "A"
         }
@@ -605,7 +605,19 @@
   "schemaVersion": 41,
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "channel",
+        "type": "query",
+        "datasource": "Prometheus",
+        "hide": 0,
+        "refresh": 1,
+        "query": "label_values(mobasher_recorder_running, channel_id)",
+        "includeAll": false,
+        "multi": false,
+        "current": {}
+      }
+    ]
   },
   "timepicker": {},
   "timezone": "browser",
