@@ -78,6 +78,11 @@ source ../venv/bin/activate
 export MOBASHER_DATA_ROOT=/Volumes/ExternalDB/Media-View-Data/data/
 nohup python recorder.py --config ../channels/kuwait1.yaml --data-root ${MOBASHER_DATA_ROOT:-../data} --heartbeat 15 > recorder.log 2>&1 &
 ```
+- Start recorder with Prometheus metrics exporter:
+```bash
+./scripts/mediaview recorder start --config mobasher/channels/kuwait1.yaml --heartbeat 15 --metrics-port 9108
+# Scrape URL: http://127.0.0.1:9108/metrics
+```
 - Stop recorder (preferred):
 ```bash
 ./scripts/mediaview recorder stop
@@ -151,6 +156,7 @@ docker-compose down
 
 - Base URL (dev): `http://127.0.0.1:8001`
 - See `docs/API.md` for endpoints and examples
+- Prometheus metrics: `GET /metrics` (text/plain; Prometheus exposition)
 
 ## 7) Tests
 

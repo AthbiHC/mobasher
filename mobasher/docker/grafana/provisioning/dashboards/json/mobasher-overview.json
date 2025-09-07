@@ -1,0 +1,71 @@
+{
+  "id": null,
+  "title": "Mobasher Overview",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "API Requests (1m)",
+      "gridPos": {"x": 0, "y": 0, "w": 8, "h": 5},
+      "targets": [
+        {"expr": "sum(rate(mobasher_api_requests_total[1m]))", "legendFormat": "req/s"}
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Recorder Heartbeats",
+      "gridPos": {"x": 8, "y": 0, "w": 8, "h": 5},
+      "targets": [
+        {"expr": "sum(increase(mobasher_recorder_heartbeats_total[5m]))", "legendFormat": "hb/5m"}
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Recorder Segments by Type",
+      "gridPos": {"x": 0, "y": 5, "w": 16, "h": 8},
+      "targets": [
+        {"expr": "sum by (media_type) (rate(mobasher_recorder_segments_total[5m]))", "legendFormat": "{{media_type}}"}
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "API Latency (p50/p90)",
+      "gridPos": {"x": 0, "y": 13, "w": 16, "h": 8},
+      "targets": [
+        {"expr": "histogram_quantile(0.5, sum(rate(mobasher_api_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50"},
+        {"expr": "histogram_quantile(0.9, sum(rate(mobasher_api_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p90"}
+      ]
+    }
+    ,
+    {
+      "type": "stat",
+      "title": "ASR Tasks/s (1m)",
+      "gridPos": {"x": 0, "y": 21, "w": 8, "h": 5},
+      "targets": [
+        {"expr": "sum(rate(asr_task_attempts_total{task=\"transcribe_segment\"}[1m]))", "legendFormat": "attempts/s"}
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "ASR Duration (p50/p90)",
+      "gridPos": {"x": 8, "y": 21, "w": 8, "h": 8},
+      "targets": [
+        {"expr": "histogram_quantile(0.5, sum(rate(asr_task_duration_seconds_bucket{task=\"transcribe_segment\"}[5m])) by (le))", "legendFormat": "p50"},
+        {"expr": "histogram_quantile(0.9, sum(rate(asr_task_duration_seconds_bucket{task=\"transcribe_segment\"}[5m])) by (le))", "legendFormat": "p90"}
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "ASR Outcomes",
+      "gridPos": {"x": 0, "y": 29, "w": 16, "h": 8},
+      "targets": [
+        {"expr": "sum by (outcome) (rate(asr_task_outcomes_total{task=\"transcribe_segment\"}[5m]))", "legendFormat": "{{outcome}}"}
+      ]
+    }
+  ],
+  "templating": {"list": []}
+}
+

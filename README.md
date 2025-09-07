@@ -188,3 +188,15 @@ This is an open-source project focused on media transparency and accountability.
 ## Contact
 
 For questions and collaboration opportunities, please open an issue on GitHub.
+
+## Monitoring
+
+- API metrics: `http://127.0.0.1:8010/metrics`
+- Recorder metrics: `http://127.0.0.1:9108/metrics`
+- Start Prometheus+Grafana (dev):
+```bash
+cd mobasher/docker
+docker-compose --profile monitoring up -d prometheus grafana
+# Prometheus: http://localhost:9090  Grafana: http://localhost:3000 (admin/admin)
+```
+- Grafana comes pre-provisioned with a Prometheus datasource and a basic dashboard: "Mobasher Overview".

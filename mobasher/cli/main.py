@@ -34,11 +34,20 @@ def recorder_start(
     data_root: Optional[str] = typer.Option(None, help="Data root (overrides MOBASHER_DATA_ROOT)"),
     heartbeat: int = typer.Option(15, help="Heartbeat seconds"),
     daemon: bool = typer.Option(True, help="Run in background using nohup"),
+    metrics_port: Optional[int] = typer.Option(None, help="Prometheus metrics port (recorder)"),
 ) -> None:
     env = os.environ.copy()
+    import sys
+    # Resolve config relative to repo root so it works from ingestion/ cwd
+    cfg_path = config
+    if not os.path.isabs(cfg_path):
+        cfg_candidate = _repo_root() / cfg_path
+        cfg_path = str(cfg_candidate.resolve())
     if data_root:
         env["MOBASHER_DATA_ROOT"] = data_root
-    cmd = f"nohup python recorder.py --config {config} --heartbeat {heartbeat} > recorder.log 2>&1 &" if daemon else f"python recorder.py --config {config} --heartbeat {heartbeat}"
+    metrics_flag = f" --metrics-port {metrics_port}" if metrics_port else ""
+    base_cmd = f"{sys.executable} recorder.py --config {cfg_path} --heartbeat {heartbeat}{metrics_flag}"
+    cmd = f"nohup {base_cmd} > recorder.log 2>&1 &" if daemon else base_cmd
     typer.echo(f"Executing: {cmd}")
     code = subprocess.call(cmd, shell=True, cwd=str(_repo_root() / "mobasher/ingestion"), env=env)
     raise typer.Exit(code)
@@ -182,10 +191,13 @@ app.add_typer(asr_app, name="asr")
 
 
 @asr_app.command("worker")
-def asr_worker() -> None:
+def asr_worker(metrics_port: int = typer.Option(9109, help="Prometheus metrics port for ASR worker"),
+               pool: str = typer.Option("solo", help="Celery pool (solo,prefork,threads)"),
+               concurrency: int = typer.Option(1, help="Worker concurrency")) -> None:
     import sys
     # Use the same interpreter to run celery to avoid PATH issues
-    cmd = f"{sys.executable} -m celery -A mobasher.asr.worker.app worker --loglevel=INFO"
+    env_prefix = f"ASR_METRICS_PORT={metrics_port} " if metrics_port else ""
+    cmd = f"{env_prefix}{sys.executable} -m celery -A mobasher.asr.worker.app worker --loglevel=INFO -P {pool} -c {concurrency}"
     code = _run(cmd, cwd=_repo_root())
     raise typer.Exit(code)
 

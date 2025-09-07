@@ -22,6 +22,7 @@ import os
 import sys
 from pathlib import Path as _Path
 import platform
+from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
 # Ensure project root is on sys.path when running from within the package directory
 _project_root = str(_Path(__file__).resolve().parents[2])
@@ -35,7 +36,7 @@ class DualHLSRecorder:
     def __init__(self, channel_config: Dict[str, Any], data_root: Path):
         self.config = channel_config
         self.channel_id = channel_config['id']
-        self.data_root = Path(data_root)
+        self.data_root = Path(data_root).resolve()
         self.recording_id: Optional[str] = None
         self.process_recorder: Optional[asyncio.subprocess.Process] = None
         self.process_audio_recorder: Optional[asyncio.subprocess.Process] = None
@@ -52,6 +53,29 @@ class DualHLSRecorder:
             init_engine()
         except Exception as e:
             logger.warning(f"DB init warning: {e}")
+
+        # Prometheus metrics
+        self.metrics_started = Gauge(
+            "mobasher_recorder_running",
+            "Recorder running flag (1 running, 0 stopped)",
+            ["channel_id"],
+        )
+        self.metrics_segments_total = Counter(
+            "mobasher_recorder_segments_total",
+            "Total segments discovered by recorder",
+            ["channel_id", "media_type"],
+        )
+        self.metrics_heartbeat = Counter(
+            "mobasher_recorder_heartbeats_total",
+            "Heartbeat counter",
+            ["channel_id"],
+        )
+        self.metrics_segment_collect_latency = Histogram(
+            "mobasher_recorder_collect_duration_seconds",
+            "Time to collect segments from disk",
+            ["channel_id"],
+            buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5),
+        )
 
         
 
@@ -211,6 +235,11 @@ class DualHLSRecorder:
         self.recording_id = str(uuid.uuid4())
         self.run_started_at = datetime.now(timezone.utc)
         self._create_directories()
+        # mark running
+        try:
+            self.metrics_started.labels(channel_id=self.channel_id).set(1)
+        except Exception:
+            pass
         # Persist recording start
         try:
             self._persist_recording_start()
@@ -257,6 +286,10 @@ class DualHLSRecorder:
         self.archive_recorder = None
         self.recording_id = None
         self.running = False
+        try:
+            self.metrics_started.labels(channel_id=self.channel_id).set(0)
+        except Exception:
+            pass
         # Remove partial/short segments produced right before stopping
         await self._cleanup_partials()
         # Remove extra full segments created during short validations (keep earliest in this run window)
@@ -293,10 +326,15 @@ class DualHLSRecorder:
     async def get_new_segments(self) -> List[Dict[str, Any]]:
         self._create_directories()
         segments: List[Dict[str, Any]] = []
+        _t0 = time.time()
         if self.audio_enabled:
             segments += await self._collect_segments(self.audio_dir, '*.wav', 'audio')
         if self.video_enabled:
             segments += await self._collect_segments(self.video_dir, '*.mp4', 'video')
+        try:
+            self.metrics_segment_collect_latency.labels(channel_id=self.channel_id).observe(time.time() - _t0)
+        except Exception:
+            pass
         return sorted(segments, key=lambda x: x['started_at'])
 
     async def _collect_segments(self, directory: Path, pattern: str, media_type: str) -> List[Dict[str, Any]]:
@@ -335,6 +373,10 @@ class DualHLSRecorder:
                     'media_type': media_type,
                     **info,
                 })
+                try:
+                    self.metrics_segments_total.labels(channel_id=self.channel_id, media_type=media_type).inc()
+                except Exception:
+                    pass
         return out
 
     def _probe_duration_seconds(self, file_path: Path) -> Optional[float]:
@@ -571,6 +613,7 @@ async def main():
     )
     parser.add_argument('--duration', type=int, default=0, help='Run duration in seconds (0 means run continuously)')
     parser.add_argument('--heartbeat', type=int, default=30, help='Heartbeat log interval in seconds')
+    parser.add_argument('--metrics-port', type=int, default=9108, help='Prometheus metrics HTTP port (0 disables)')
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -581,6 +624,13 @@ async def main():
 
     config = load_channel_config(args.config)
     recorder = DualHLSRecorder(config, Path(args.data_root))
+    # Start Prometheus exporter if enabled
+    if args.metrics_port > 0:
+        try:
+            start_http_server(args.metrics_port)
+            logger.info(f'Metrics exporter started on :{args.metrics_port}')
+        except Exception as e:
+            logger.warning(f'Failed to start metrics exporter: {e}')
     rec_id = await recorder.start_recording()
     logger.info(f'Recording started | id={rec_id} | channel={recorder.channel_id}')
 
@@ -602,6 +652,10 @@ async def main():
                 segs = await recorder.get_new_segments()
                 num_audio = sum(1 for s in segs if s['media_type'] == 'audio')
                 num_video = sum(1 for s in segs if s['media_type'] == 'video')
+                try:
+                    recorder.metrics_heartbeat.labels(channel_id=recorder.channel_id).inc()
+                except Exception:
+                    pass
                 logger.info(
                     f'heartbeat | audio_segments_today={num_audio} | video_segments_today={num_video}'
                 )
