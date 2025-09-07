@@ -35,7 +35,8 @@ class VisionSettings(BaseSettings):
     # Faces
     faces_fps: float = 1.0
     faces_det_thresh: float = 0.4
-    faces_rec_thresh: float = 0.35
+    faces_rec_thresh: float = 0.45
+    faces_min_size_px: int = 40
     faces_model: str = "buffalo_l"  # insightface model pack
     faces_gallery_dir: Optional[str] = None  # e.g., "/path/to/gallery/<identity>/*.jpg"
 
@@ -567,6 +568,8 @@ def faces_segment(self, segment_id: str, segment_started_at_iso: str) -> Dict[st
             for f in faces:
                 x1, y1, x2, y2 = map(int, f.bbox.astype(int))
                 emb = f.normed_embedding
+                if (y2 - y1) < settings.faces_min_size_px:
+                    continue
                 best_ident = None
                 best_score = -1.0
                 for ident, gemb in gallery:

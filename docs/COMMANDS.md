@@ -42,6 +42,24 @@ This document catalogs common commands and workflows for developing, running, an
   ```bash
   PYTHONPATH=. mobasher/venv/bin/python scripts/gallery_builder.py plan
   ```
+- Download images listed in plan (rate-limited, resumable):
+  ```bash
+  PYTHONPATH=. mobasher/venv/bin/python scripts/gallery_builder.py download \
+    --plan /Volumes/ExternalDB/Media-View-Data/data/gallery/plan.jsonl \
+    --out  /Volumes/ExternalDB/Media-View-Data/data/gallery/images --rate 2
+  ```
+- Process gallery locally (face crops + embeddings):
+  ```bash
+  PYTHONPATH=. mobasher/venv/bin/python scripts/gallery_process.py \
+    --root /Volumes/ExternalDB/Media-View-Data/data/gallery/images \
+    --out  /Volumes/ExternalDB/Media-View-Data/data/gallery/processed \
+    --per_identity 5 --det_thresh 0.6
+  ```
+
+### Face task tuning
+- Set gallery root: `export FACES_GALLERY_DIR=/Volumes/ExternalDB/Media-View-Data/data/gallery/images`
+- Recognition threshold: default 0.45 (override `export FACES_REC_THRESH=0.45`)
+- Min face size: default 40 px height (override `export FACES_MIN_SIZE_PX=40`)
 - "sync docs": Updates README and docs (including `docs/CHANGES-LOG.md`) to reflect changes, commits with a docs message, and pushes to the current branch (no branch switching).
 - "fresh branch": Creates a new branch with `feature/<name>` or `fix/<name>`.
 - "status check": Shows git status, recent commits, and a quick project structure overview.
