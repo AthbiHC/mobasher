@@ -1,7 +1,7 @@
 # Project Status Snapshot
 
-Timestamp: 2025-09-06T14:30:00Z
-Branch: alpha-011
+Timestamp: 2025-09-07T19:20:00Z
+Branch: alpha-014
 
 ## Phase progress
 - Phase 1 (API/Repos): done.
@@ -13,8 +13,9 @@ Branch: alpha-011
   - API: `/visual-events` with filters (channel, type, region, time, q, min_conf).
 
 ## Runtime notes
-- Ultralytics installed; note numpy pin conflict (currently numpy 2.2.6). If YOLO import issues arise, pin numpy<2.0 for object runs.
-- InsightFace installed; `buffalo_l` pack downloading (slow). Use `FACES_GALLERY_DIR` to enable identity matching.
+- Recorders running on external data root: `/Volumes/ExternalDB/Media-View-Data/data`.
+- New archive recorder (hour-aligned) writing to `data/archive/<channel>/<YYYY-MM-DD>/` with thumbnails.
+- Fresh ops: `freshreset`, `kill-the-minions`. Recorder stop improved (kills ffmpeg and metrics ports).
 
 ## Current TODOs (at time of snapshot)
 - vision-faces-impl: Add face detection/recognition task (InsightFace SCRFD + ArcFace)
@@ -23,7 +24,7 @@ Branch: alpha-011
 - vision-screenshot-policy: Implement screenshot retention policy and cleanup job
 - api-vision-polish: Add visual-events class filters, counts endpoint, and DB indexes
 
-## Next actions (short)
-1) Finish InsightFace model download, confirm analyzer ready.
-2) Provide/enroll gallery; run faces on one segment.
-3) Add counts endpoint + indices; reprocess CLI.
+## Next session (short)
+1) Verify archive recorder first hour cut + thumbnail creation (Kuwait).
+2) Start/monitor recorders for target channels; validate Grafana v2 per-channel stats.
+3) Review `docs/014-NLP-ALERTS.md`; decide NER model shortlist and start migrations for `entities`/`alerts`.
