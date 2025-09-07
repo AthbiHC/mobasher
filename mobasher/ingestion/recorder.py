@@ -70,11 +70,21 @@ class DualHLSRecorder:
             "Heartbeat counter",
             ["channel_id"],
         )
+        # Ensure time series is created for this channel_id
+        try:
+            self.metrics_heartbeat.labels(channel_id=self.channel_id).inc(0)
+        except Exception:
+            pass
         self.metrics_segment_collect_latency = Histogram(
             "mobasher_recorder_collect_duration_seconds",
             "Time to collect segments from disk",
             ["channel_id"],
             buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5),
+        )
+        self.metrics_last_hb = Gauge(
+            "mobasher_recorder_last_heartbeat_seconds",
+            "Unix time of last heartbeat",
+            ["channel_id"],
         )
 
         
@@ -654,6 +664,8 @@ async def main():
                 num_video = sum(1 for s in segs if s['media_type'] == 'video')
                 try:
                     recorder.metrics_heartbeat.labels(channel_id=recorder.channel_id).inc()
+                    import time as _t
+                    recorder.metrics_last_hb.labels(channel_id=recorder.channel_id).set(_t.time())
                 except Exception:
                     pass
                 logger.info(
