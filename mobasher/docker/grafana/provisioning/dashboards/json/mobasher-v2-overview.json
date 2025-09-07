@@ -11,19 +11,22 @@
     {"type": "stat", "title": "Recorder Heartbeats (5m)", "id": 2, "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0},
      "targets": [{"refId": "A", "expr": "sum(increase(mobasher_recorder_heartbeats_total[5m]))"}],
      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}},
-    {"type": "timeseries", "title": "Segments/s by Type", "id": 3, "gridPos": {"h": 7, "w": 24, "x": 0, "y": 6},
-     "targets": [{"refId": "A", "expr": "sum by (media_type) (rate(mobasher_recorder_segments_total[5m]))"}]},
+    {"type": "stat", "title": "Segments/s (channel)", "id": 7, "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0},
+     "targets": [{"refId": "A", "expr": "sum(rate(mobasher_recorder_segments_total{channel_id=\"$channel\"}[1m]))"}],
+     "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value"}},
+    {"type": "timeseries", "title": "Segments/s by Type (channel)", "id": 3, "gridPos": {"h": 7, "w": 24, "x": 0, "y": 6},
+     "targets": [{"refId": "A", "expr": "sum by (media_type) (rate(mobasher_recorder_segments_total{channel_id=\"$channel\"}[5m]))"}]},
     {"type": "timeseries", "title": "API Latency (p50/p90)", "id": 4, "gridPos": {"h": 6, "w": 24, "x": 0, "y": 13},
      "targets": [
        {"refId": "A", "expr": "histogram_quantile(0.5, sum(rate(mobasher_api_request_duration_seconds_bucket[5m])) by (le))"},
        {"refId": "B", "expr": "histogram_quantile(0.9, sum(rate(mobasher_api_request_duration_seconds_bucket[5m])) by (le))"}
      ]},
-    {"type": "stat", "title": "ASR Tasks/s (1m)", "id": 5, "gridPos": {"h": 5, "w": 8, "x": 0, "y": 19},
-     "targets": [{"refId": "A", "expr": "sum(rate(asr_task_attempts_total{task=\"transcribe_segment\"}[1m]))"}]},
-    {"type": "timeseries", "title": "ASR Duration (p50/p90)", "id": 6, "gridPos": {"h": 6, "w": 24, "x": 0, "y": 24},
+    {"type": "stat", "title": "ASR Tasks/s (channel)", "id": 5, "gridPos": {"h": 5, "w": 8, "x": 0, "y": 19},
+     "targets": [{"refId": "A", "expr": "sum(rate(asr_task_attempts_total{task=\"transcribe_segment\",channel_id=\"$channel\"}[1m]))"}]},
+    {"type": "timeseries", "title": "ASR Duration (p50/p90, channel)", "id": 6, "gridPos": {"h": 6, "w": 24, "x": 0, "y": 24},
      "targets": [
-       {"refId": "A", "expr": "histogram_quantile(0.5, sum(rate(asr_task_duration_seconds_bucket{task=\"transcribe_segment\"}[5m])) by (le))"},
-       {"refId": "B", "expr": "histogram_quantile(0.9, sum(rate(asr_task_duration_seconds_bucket{task=\"transcribe_segment\"}[5m])) by (le))"}
+       {"refId": "A", "expr": "histogram_quantile(0.5, sum(rate(asr_task_duration_seconds_bucket{task=\"transcribe_segment\",channel_id=\"$channel\"}[5m])) by (le))"},
+       {"refId": "B", "expr": "histogram_quantile(0.9, sum(rate(asr_task_duration_seconds_bucket{task=\"transcribe_segment\",channel_id=\"$channel\"}[5m])) by (le))"}
      ]}
   ],
   "refresh": "10s",
