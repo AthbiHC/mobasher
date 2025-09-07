@@ -45,4 +45,15 @@
       - https://stream.skynewsarabia.com/hls/sna_720.m3u8
       - https://stream.skynewsarabia.com/hls/sna_480.m3u8
 
+- Name: CNBC Arabia (UAE)
+  - URL: https://www.elahmad.com/tv/mobiletv/glarb.php?id=cnbc_arabia
+  - Official: https://www.cnbcarabia.com/
+  - Type: Business News
+  - Notes: Arabic business/markets news channel.
+  - Streams:
+    - Master HLS: https://cnbc-live.akamaized.net/cnbc/master.m3u8
+    - Variants (examples):
+      - https://cnbc-live.akamaized.net/cnbc/master_720p.m3u8
+      - https://cnbc-live.akamaized.net/cnbc/master_360p.m3u8
+
 
