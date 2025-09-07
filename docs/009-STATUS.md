@@ -16,6 +16,7 @@ Branch: alpha-014
 - Recorders running on external data root: `/Volumes/ExternalDB/Media-View-Data/data`.
 - New archive recorder (hour-aligned) writing to `data/archive/<channel>/<YYYY-MM-DD>/` with thumbnails.
 - Fresh ops: `freshreset`, `kill-the-minions`. Recorder stop improved (kills ffmpeg and metrics ports).
+ - Archive recorder check: after ~1h, no files found under `/Volumes/ExternalDB/Media-View-Data/data/archive/kuwait_news/2025-09-07` and process not running.
 
 ## Current TODOs (at time of snapshot)
 - vision-faces-impl: Add face detection/recognition task (InsightFace SCRFD + ArcFace)
@@ -26,5 +27,6 @@ Branch: alpha-014
 
 ## Next session (short)
 1) Verify archive recorder first hour cut + thumbnail creation (Kuwait).
-2) Start/monitor recorders for target channels; validate Grafana v2 per-channel stats.
-3) Review `docs/014-NLP-ALERTS.md`; decide NER model shortlist and start migrations for `entities`/`alerts`.
+2) Re-run archive in encode mode (or add debug logging) to ensure top-of-hour cuts; confirm output path.
+3) Start/monitor recorders for target channels; validate Grafana v2 per-channel stats.
+4) Review `docs/014-NLP-ALERTS.md`; decide NER model shortlist and start migrations for `entities`/`alerts`.
