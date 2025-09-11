@@ -453,11 +453,13 @@ app.add_typer(asr_app, name="asr")
 @asr_app.command("worker")
 def asr_worker(metrics_port: int = typer.Option(9109, help="Prometheus metrics port for ASR worker"),
                pool: str = typer.Option("solo", help="Celery pool (solo,prefork,threads)"),
-               concurrency: int = typer.Option(1, help="Worker concurrency")) -> None:
+               concurrency: int = typer.Option(1, help="Worker concurrency"),
+               name: Optional[str] = typer.Option(None, help="Optional Celery worker name (-n)")) -> None:
     import sys
     # Use the same interpreter to run celery to avoid PATH issues
     env_prefix = f"ASR_METRICS_PORT={metrics_port} " if metrics_port else ""
-    cmd = f"{env_prefix}{sys.executable} -m celery -A mobasher.asr.worker.app worker --loglevel=INFO -P {pool} -c {concurrency}"
+    name_flag = f" -n {name}" if name else ""
+    cmd = f"{env_prefix}{sys.executable} -m celery -A mobasher.asr.worker.app worker --loglevel=INFO -P {pool} -c {concurrency}{name_flag}"
     code = _run(cmd, cwd=_repo_root())
     raise typer.Exit(code)
 
