@@ -21,12 +21,31 @@ This document catalogs common commands and workflows for developing, running, an
   - Reset vision artifacts (manual): truncate `visual_events` and delete screenshots under `${MOBASHER_SCREENSHOT_ROOT:-/Volumes/ExternalDB/Media-View-Data/data/screenshot}`.
   - Retention: `./scripts/mediaview db retention --dry-run`
 
+### Central short commands (new)
+- Status summary:
+```bash
+./scripts/mediaview status         # add --json for machine output
+```
+- Channels:
+```bash
+./scripts/mediaview channels list --json
+./scripts/mediaview channels add kuwait_news --name "Kuwait News" --url "https://..."
+./scripts/mediaview channels enable kuwait_news
+./scripts/mediaview channels disable kuwait_news
+```
+- Screenshots:
+```bash
+./scripts/mediaview vision enqueue-screenshots --limit 12
+./scripts/mediaview screenshots latest --limit 12 --json
+```
+
 ## 2) Repository Workflow (custom assistant commands)
 
 - "push the push": Updates docs as needed, commits all changes, pushes to current branch, then creates and switches to the next sequential `alpha-XXX` branch.
 ## 9) Vision utilities
 - Reprocess (batch): `./scripts/mediaview vision reprocess --channel <id> --since <iso> --until <iso> --ops ocr,objects,faces --fps 1`
 - Reset OCR artifacts (manual): truncate `visual_events`, delete `${MOBASHER_SCREENSHOT_ROOT}` files.
+ - Screenshots enqueue: `./scripts/mediaview vision enqueue-screenshots --limit 12`
 - Run object detection for recent segments:
   - Install once: `source mobasher/venv/bin/activate && pip install ultralytics==8.3.67`
   - Enqueue: `./scripts/mediaview vision enqueue --limit 10` (runs OCR and objects)

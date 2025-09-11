@@ -40,6 +40,14 @@ A unified command-line tool `mediaview` to manage development and operations of 
 - `mediaview info config` (effective config)
 - `mediaview info env` (key envs; redacts passwords)
 
+### central short commands (new)
+- `mediaview status [--json]`: DB/Redis/API health, segments/transcripts counts (10m window), overall status.
+- `mediaview channels list [--json] [--active-only] [--limit N] [--offset N]`
+- `mediaview channels add <id> --name ".." --url ".." [--active/--no-active] [--description ".."]`
+- `mediaview channels enable <id>` / `mediaview channels disable <id>`
+- `mediaview screenshots latest [--channel-id <id>] [--limit N] [--json]`
+- `mediaview vision enqueue-screenshots [--limit N]`
+
 ## v1 Implementation Notes
 - Process management: default pgrep/pkill; `--daemon` uses `nohup` for background.
 - Destructive ops require `--yes`.
