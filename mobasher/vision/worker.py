@@ -188,6 +188,82 @@ def _preprocess_for_ocr(image: Any) -> Any:
     return inv
 
 
+@app.task(name="vision.screenshots_segment", bind=True, max_retries=2, default_retry_delay=10)
+def screenshots_segment(self, segment_id: str, segment_started_at_iso: str) -> Dict[str, Any]:
+    """Sample a few frames from a video segment and save JPEG screenshots.
+
+    Saves files under MOBASHER_SCREENSHOT_ROOT/<channel>/<YYYY-MM-DD>/ and records
+    rows in the screenshots table for fast listing.
+    """
+    start = perf_counter()
+    from datetime import datetime
+    from uuid import UUID
+    from mobasher.storage.db import get_session, init_engine
+    from mobasher.storage.models import Segment, Screenshot
+    import subprocess
+    import os
+
+    init_engine()
+    saved = 0
+    with next(get_session()) as db:  # type: ignore
+        seg = db.get(Segment, (UUID(segment_id), datetime.fromisoformat(segment_started_at_iso)))
+        if seg is None or not seg.video_path:
+            raise self.retry(exc=RuntimeError("segment_missing_or_no_video"))
+
+        # Probe duration via ffprobe
+        try:
+            result = subprocess.run([
+                'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                '-of', 'default=nokey=1:noprint_wrappers=1', seg.video_path
+            ], capture_output=True, text=True)
+            duration_s = float(result.stdout.strip()) if result.returncode == 0 else 60.0
+        except Exception:
+            duration_s = 60.0
+
+        # Sample at 30%, 60%, 90%
+        stamps = []
+        for r in (0.3, 0.6, 0.9):
+            ts = max(0.0, min(duration_s - 0.01, duration_s * r))
+            if ts not in stamps:
+                stamps.append(ts)
+
+        screenshot_root = os.environ.get('MOBASHER_SCREENSHOT_ROOT', '/Volumes/ExternalDB/Media-View-Data/data/screenshot')
+        date_part = seg.started_at.strftime('%Y-%m-%d') if hasattr(seg, 'started_at') and seg.started_at else 'unknown'
+        out_dir = os.path.join(screenshot_root, seg.channel_id, date_part)
+        try:
+            os.makedirs(out_dir, exist_ok=True)
+        except Exception:
+            pass
+
+        base_name = os.path.basename(seg.video_path)
+        for ts in stamps:
+            fr = _read_frame_at(seg.video_path, ts)
+            if fr is None:
+                continue
+            frame, w, h = fr
+            # filename: <base>-t<ms>.jpg
+            ms = int(ts * 1000)
+            shot_name = f"{os.path.splitext(base_name)[0]}-t{ms}.jpg"
+            shot_path = os.path.join(out_dir, shot_name)
+            try:
+                import cv2
+                cv2.imwrite(shot_path, frame)
+                sc = Screenshot(
+                    channel_id=seg.channel_id,
+                    segment_id=UUID(segment_id),
+                    segment_started_at=datetime.fromisoformat(segment_started_at_iso),
+                    frame_timestamp_ms=ms,
+                    screenshot_path=shot_path,
+                )
+                db.add(sc)
+                saved += 1
+            except Exception:
+                pass
+        if saved:
+            db.commit()
+    return {"ok": True, "saved": saved, "elapsed_ms": int((perf_counter() - start) * 1000)}
+
+
 @app.task(name="vision.ocr_segment", bind=True, max_retries=2, default_retry_delay=10)
 def ocr_segment(self, segment_id: str, segment_started_at_iso: str) -> Dict[str, Any]:
     start = perf_counter()

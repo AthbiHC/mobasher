@@ -204,6 +204,46 @@ def channels_disable(channel_id: str = typer.Argument(...)) -> None:
         typer.echo(f"disabled channel: {channel_id}")
 
 
+# -------------------- Screenshots helpers --------------------
+
+screenshots_app = typer.Typer(help="Screenshots operations")
+app.add_typer(screenshots_app, name="screenshots")
+
+
+@screenshots_app.command("latest")
+def screenshots_latest(
+    channel_id: Optional[str] = typer.Option(None),
+    limit: int = typer.Option(12),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    import httpx  # type: ignore
+    import os as _os
+    host = _os.environ.get("API_HOST", "127.0.0.1")
+    port = int(_os.environ.get("API_PORT", "8010"))
+    params = {"limit": str(limit)}
+    if channel_id:
+        params["channel_id"] = channel_id
+    url = f"http://{host}:{port}/screenshots"
+    r = httpx.get(url, params=params, timeout=5.0)
+    r.raise_for_status()
+    data = r.json()
+    if json_out:
+        typer.echo(json.dumps(data))
+    else:
+        for it in data.get("items", []):
+            typer.echo(f"{it['created_at']}\t{it['channel_id']}\t{it['screenshot_path']}")
+
+
+@vision_app.command("enqueue-screenshots")
+def vision_enqueue_screenshots(limit: int = typer.Option(12)) -> None:
+    import sys
+    code = _run(
+        f"{sys.executable} -c 'from mobasher.vision.enqueue import enqueue_screenshots_for_recent; print(enqueue_screenshots_for_recent({limit}))' | cat",
+        cwd=_repo_root(),
+    )
+    raise typer.Exit(code)
+
+
 recorder_app = typer.Typer(help="Recorder management")
 app.add_typer(recorder_app, name="recorder")
 

@@ -125,3 +125,23 @@ class PaginatedVisualEvents(BaseModel):
     items: list[VisualEventOut]
     meta: PageMeta
 
+
+# -------- Screenshots --------
+
+class ScreenshotOut(BaseModel):
+    id: UUID
+    channel_id: str
+    segment_id: UUID
+    segment_started_at: datetime
+    frame_timestamp_ms: int
+    screenshot_path: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PaginatedScreenshots(BaseModel):
+    items: list[ScreenshotOut]
+    meta: PageMeta
+

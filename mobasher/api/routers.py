@@ -19,6 +19,8 @@ from .schemas import (
     SegmentWithTranscript,
     PaginatedVisualEvents,
     VisualEventOut,
+    PaginatedScreenshots,
+    ScreenshotOut,
 )
 from .deps import get_db
 from mobasher.storage.repositories import (
@@ -30,6 +32,7 @@ from mobasher.storage.repositories import (
     list_recent_transcripts,
 )
 from mobasher.storage.models import VisualEvent
+from mobasher.storage.models import Screenshot
 
 
 router = APIRouter()
@@ -154,6 +157,26 @@ def api_list_visual_events(
     )
     next_offset = offset + len(items) if len(items) == limit else None
     return PaginatedVisualEvents(items=items, meta=PageMeta(limit=limit, offset=offset, next_offset=next_offset))
+
+
+@router.get("/screenshots", response_model=PaginatedScreenshots, tags=["vision"]) 
+def api_list_screenshots(
+    channel_id: Optional[str] = Query(None),
+    since: Optional[datetime] = Query(None),
+    limit: int = Query(24, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+) -> PaginatedScreenshots:
+    query = db.query(Screenshot)
+    if channel_id:
+        query = query.filter(Screenshot.channel_id == channel_id)
+    if since:
+        query = query.filter(Screenshot.created_at >= since)
+    items = (
+        query.order_by(Screenshot.created_at.desc()).offset(offset).limit(limit).all()
+    )
+    next_offset = offset + len(items) if len(items) == limit else None
+    return PaginatedScreenshots(items=items, meta=PageMeta(limit=limit, offset=offset, next_offset=next_offset))
 
 
 

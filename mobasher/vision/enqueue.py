@@ -37,3 +37,22 @@ def enqueue_vision_for_asr_processed(limit: int = 20) -> int:
     return count
 
 
+def enqueue_screenshots_for_recent(limit: int = 20) -> int:
+    """Enqueue screenshots for recent segments that have video (no transcript requirement)."""
+    from mobasher.vision.worker import screenshots_segment
+    init_engine()
+    count = 0
+    with next(get_session()) as db:  # type: ignore
+        segs = (
+            db.query(Segment)
+            .filter(Segment.video_path != None)
+            .order_by(Segment.started_at.desc())
+            .limit(limit)
+            .all()
+        )
+        for seg in segs:
+            screenshots_segment.delay(str(seg.id), seg.started_at.isoformat())
+            count += 1
+    return count
+
+
