@@ -466,7 +466,8 @@ def asr_worker(metrics_port: int = typer.Option(9109, help="Prometheus metrics p
 
 @asr_app.command("ping")
 def asr_ping() -> None:
-    code = _run("python -c 'from mobasher.asr.worker import ping; print(ping.delay().get(timeout=5))' | cat", cwd=_repo_root())
+    import sys
+    code = _run(f"{sys.executable} -c 'from mobasher.asr.worker import ping; print(ping.delay().get(timeout=5))' | cat", cwd=_repo_root())
     raise typer.Exit(code)
 
 
@@ -490,7 +491,8 @@ def asr_scheduler(
     interval: int = typer.Option(30, help="Polling interval seconds"),
     lookback: int = typer.Option(10, help="Lookback minutes"),
 ) -> None:
-    code = _run(f"python -c 'from mobasher.asr.scheduler import run_scheduler_blocking; run_scheduler_blocking(channel_id={repr(channel_id)}, interval_seconds={interval}, lookback_minutes={lookback})'", cwd=_repo_root())
+    import sys
+    code = _run(f"{sys.executable} -c 'from mobasher.asr.scheduler import run_scheduler_blocking; run_scheduler_blocking(channel_id={repr(channel_id)}, interval_seconds={interval}, lookback_minutes={lookback})'", cwd=_repo_root())
     raise typer.Exit(code)
 
 
