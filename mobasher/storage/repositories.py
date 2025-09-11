@@ -258,20 +258,30 @@ def list_recent_transcripts(
     limit: int = 100,
     offset: int = 0,
 ) -> List[Tuple[Segment, Transcript]]:
-    # Join on composite keys via manual where conditions
-    seg_stmt = select(Segment)
+    """Return recent transcripts, paginated by transcript recency.
+
+    This pages over transcripts directly (ordered by Transcript.segment_started_at desc)
+    and joins to the corresponding Segment, ensuring every returned item has a transcript.
+    This avoids empty result pages when the newest segments are not yet transcribed.
+    """
+    stmt: Select = (
+        select(Segment, Transcript)
+        .join(
+            Transcript,
+            and_(
+                Transcript.segment_id == Segment.id,
+                Transcript.segment_started_at == Segment.started_at,
+            ),
+        )
+    )
     if channel_id:
-        seg_stmt = seg_stmt.where(Segment.channel_id == channel_id)
+        stmt = stmt.where(Segment.channel_id == channel_id)
     if since:
-        seg_stmt = seg_stmt.where(Segment.started_at >= since)
-    seg_stmt = seg_stmt.order_by(desc(Segment.started_at)).offset(offset).limit(limit)
-    segments = list(db.execute(seg_stmt).scalars().all())
-    results: List[Tuple[Segment, Transcript]] = []
-    for seg in segments:
-        tr = db.get(Transcript, (seg.id, seg.started_at))
-        if tr is not None:
-            results.append((seg, tr))
-    return results
+        stmt = stmt.where(Transcript.segment_started_at >= since)
+    stmt = stmt.order_by(desc(Transcript.segment_started_at)).offset(offset).limit(limit)
+
+    rows = list(db.execute(stmt).all())
+    return [(row[0], row[1]) for row in rows]
 
 
 # -------------------- Embeddings (pgvector) --------------------
