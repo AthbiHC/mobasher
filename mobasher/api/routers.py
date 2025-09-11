@@ -33,6 +33,7 @@ from mobasher.storage.repositories import (
 )
 from mobasher.storage.models import VisualEvent
 from mobasher.storage.models import Screenshot
+from mobasher.storage.models import Entity
 
 
 router = APIRouter()
@@ -177,6 +178,50 @@ def api_list_screenshots(
     )
     next_offset = offset + len(items) if len(items) == limit else None
     return PaginatedScreenshots(items=items, meta=PageMeta(limit=limit, offset=offset, next_offset=next_offset))
+
+
+@router.get("/entities/stats", tags=["nlp"]) 
+def api_entities_stats(
+    since: Optional[datetime] = Query(None),
+    until: Optional[datetime] = Query(None),
+    channel_id: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=1000),
+    db: Session = Depends(get_db),
+) -> List[dict]:
+    q = db.query(Entity.text, Entity.label, func.count(Entity.text).label("cnt"))
+    if channel_id:
+        q = q.filter(Entity.channel_id == channel_id)
+    if since:
+        q = q.filter(Entity.started_at >= since)
+    if until:
+        q = q.filter(Entity.started_at < until)
+    rows = (
+        q.group_by(Entity.text, Entity.label).order_by(func.count(Entity.text).desc()).limit(limit).all()
+    )
+    return [{"text": r[0], "label": r[1], "count": int(r[2])} for r in rows]
+
+
+@router.get("/entities/stats_by_label", tags=["nlp"]) 
+def api_entities_stats_by_label(
+    since: Optional[datetime] = Query(None),
+    until: Optional[datetime] = Query(None),
+    channel_id: Optional[str] = Query(None),
+    limit_per_label: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+) -> Dict[str, List[dict]]:
+    labels = [r[0] for r in db.query(Entity.label).distinct().all()]
+    out: Dict[str, List[dict]] = {}
+    for label in labels:
+        q = db.query(Entity.text, func.count(Entity.text).label("cnt")).filter(Entity.label == label)
+        if channel_id:
+            q = q.filter(Entity.channel_id == channel_id)
+        if since:
+            q = q.filter(Entity.started_at >= since)
+        if until:
+            q = q.filter(Entity.started_at < until)
+        rows = q.group_by(Entity.text).order_by(func.count(Entity.text).desc()).limit(limit_per_label).all()
+        out[label] = [{"text": r[0], "count": int(r[1])} for r in rows]
+    return out
 
 
 

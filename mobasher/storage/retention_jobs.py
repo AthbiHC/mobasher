@@ -45,7 +45,13 @@ def delete_older_than(table: str, cutoff_iso: str) -> str:
 
 
 def count_older_than(table: str) -> str:
-    return f"SELECT count(*) FROM {table} WHERE segment_started_at < :cutoff"
+    if table in ("transcripts", "segment_embeddings"):
+        return f"SELECT count(*) FROM {table} WHERE segment_started_at < :cutoff"
+    if table in ("entities",):
+        return f"SELECT count(*) FROM {table} WHERE started_at < :cutoff"
+    if table in ("alerts",):
+        return f"SELECT count(*) FROM {table} WHERE created_at < :cutoff"
+    raise ValueError(f"Unsupported count table: {table}")
 
 
 def run_cleanup(
@@ -127,7 +133,18 @@ def main() -> None:
     )
 
     mode = "DRY-RUN" if args.dry_run else "DELETED"
-    print(f"{mode}: transcripts={deleted_transcripts}, embeddings={deleted_embeddings}, screenshots_files={deleted_screenshots}")
+    # Optional: Entities/alerts DB cleanup (non-hypertable) by age (use count_older_than to estimate)
+    try:
+        engine = init_engine()
+        now = datetime.now(timezone.utc)
+        entities_cutoff = now - timedelta(days=args.retain_transcripts_days)
+        alerts_cutoff = now - timedelta(days=args.retain_transcripts_days)
+        with engine.begin() as conn:
+            ents = conn.execute(text(count_older_than("entities")), {"cutoff": entities_cutoff}).scalar_one()
+            alrt = conn.execute(text(count_older_than("alerts")), {"cutoff": alerts_cutoff}).scalar_one()
+        print(f"{mode}: transcripts={deleted_transcripts}, embeddings={deleted_embeddings}, screenshots_files={deleted_screenshots}, entities_old={int(ents)}, alerts_old={int(alrt)}")
+    except Exception:
+        print(f"{mode}: transcripts={deleted_transcripts}, embeddings={deleted_embeddings}, screenshots_files={deleted_screenshots}")
 
 
 if __name__ == "__main__":

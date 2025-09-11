@@ -244,6 +244,40 @@ def vision_enqueue_screenshots(limit: int = typer.Option(12)) -> None:
     raise typer.Exit(code)
 
 
+# -------------------- NLP commands --------------------
+
+nlp_app = typer.Typer(help="NLP pipeline")
+app.add_typer(nlp_app, name="nlp")
+
+
+@nlp_app.command("worker")
+def nlp_worker(metrics_port: int = typer.Option(9112, help="Prometheus metrics port"), pool: str = typer.Option("solo"), concurrency: int = typer.Option(1)) -> None:
+    import sys
+    env_prefix = f"NLP_METRICS_PORT={metrics_port} " if metrics_port else ""
+    cmd = f"{env_prefix}{sys.executable} -m celery -A mobasher.nlp.worker.app worker --loglevel=INFO -P {pool} -c {concurrency}"
+    code = _run(cmd, cwd=_repo_root())
+    raise typer.Exit(code)
+
+
+@nlp_app.command("enqueue")
+def nlp_enqueue(channel_id: Optional[str] = typer.Option(None), limit: int = typer.Option(50)) -> None:
+    import sys
+    code = _run(
+        f"{sys.executable} -c 'from mobasher.storage.db import get_session, init_engine; from mobasher.storage.models import Segment, Transcript; from mobasher.nlp.worker import entities_for_transcript, alerts_for_transcript; init_engine();\nfrom datetime import datetime, timedelta, timezone; now=datetime.now(timezone.utc); since=now - timedelta(minutes=60);\nimport sys as _s;\nfrom uuid import UUID as _U;\nfrom mobasher.storage.db import get_session as _gs; from mobasher.storage.models import Segment as _Seg, Transcript as _Tr;\nwith next(_gs()) as db: segs=db.query(_Seg).filter(_Seg.started_at>=since){'.filter(_Seg.channel_id==\''+channel_id+'\')' if channel_id else ''}.order_by(_Seg.started_at.desc()).limit({limit}).all();\n[entities_for_transcript.delay(str(s.id), s.started_at.isoformat()) or alerts_for_transcript.delay(str(s.id), s.started_at.isoformat()) for s in segs if db.get(_Tr,(s.id,s.started_at)) is not None]; print(len(segs))' | cat",
+        cwd=_repo_root(),
+    )
+    raise typer.Exit(code)
+
+
+@nlp_app.command("scheduler")
+def nlp_scheduler(channel_id: Optional[str] = typer.Option(None), interval: int = typer.Option(30), lookback: int = typer.Option(10)) -> None:
+    code = _run(
+        f"python -c 'from mobasher.nlp.scheduler import run_scheduler_blocking; run_scheduler_blocking(channel_id={repr(channel_id)}, interval_seconds={interval}, lookback_minutes={lookback})'",
+        cwd=_repo_root(),
+    )
+    raise typer.Exit(code)
+
+
 recorder_app = typer.Typer(help="Recorder management")
 app.add_typer(recorder_app, name="recorder")
 
