@@ -308,3 +308,26 @@ class ChannelStatsView(Base):
     transcribed_segments: Mapped[int] = mapped_column(Integer)
     avg_confidence: Mapped[Optional[float]] = mapped_column(Float)
     last_segment_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class Screenshot(Base):
+    """Saved screenshots for segments (fast listing for UI)."""
+    
+    __tablename__ = "screenshots"
+    
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    channel_id: Mapped[str] = mapped_column(String, nullable=False)
+    segment_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    segment_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    frame_timestamp_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    screenshot_path: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        default=lambda: datetime.now(timezone.utc)
+    )
+    
+    __table_args__ = (
+        Index("idx_screenshots_channel_created", "channel_id", "created_at"),
+        Index("idx_screenshots_segment", "segment_id", "segment_started_at"),
+        Index("idx_screenshots_created", "created_at"),
+    )
