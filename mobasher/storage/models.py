@@ -331,3 +331,54 @@ class Screenshot(Base):
         Index("idx_screenshots_segment", "segment_id", "segment_started_at"),
         Index("idx_screenshots_created", "created_at"),
     )
+
+
+class Entity(Base):
+    """Named entities extracted from transcripts (non-hypertable)."""
+
+    __tablename__ = "entities"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    segment_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    channel_id: Mapped[str] = mapped_column(String, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str] = mapped_column(String, nullable=False)  # PERSON/ORG/LOC/etc.
+    confidence: Mapped[Optional[float]] = mapped_column(Float)
+    char_start: Mapped[Optional[int]] = mapped_column(Integer)
+    char_end: Mapped[Optional[int]] = mapped_column(Integer)
+    text_norm: Mapped[Optional[str]] = mapped_column(Text)
+    model: Mapped[Optional[str]] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        Index("idx_entities_channel_started", "channel_id", "started_at"),
+        Index("idx_entities_label_started", "label", "started_at"),
+    )
+
+
+class Alert(Base):
+    """Curated phrase alerts from transcripts (non-hypertable)."""
+
+    __tablename__ = "alerts"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    channel_id: Mapped[str] = mapped_column(String, nullable=False)
+    segment_id: Mapped[Optional[UUID]] = mapped_column(PG_UUID(as_uuid=True))
+    matched_phrase: Mapped[str] = mapped_column(String, nullable=False)
+    category: Mapped[Optional[str]] = mapped_column(String)
+    score: Mapped[Optional[float]] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+    payload_json: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+
+    __table_args__ = (
+        Index("idx_alerts_channel_created", "channel_id", "created_at"),
+        Index("idx_alerts_category_created", "category", "created_at"),
+    )
