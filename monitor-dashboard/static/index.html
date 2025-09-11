@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mobasher Monitor</title>
+    <style>
+      body { font-family: system-ui, Arial, sans-serif; margin: 0; padding: 16px; background: #0b0d10; color: #e6e9ef; }
+      h1 { font-size: 20px; margin: 0 0 16px; }
+      .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+      .box { background: #14161a; border-radius: 8px; padding: 12px; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; }
+      .shot { width: 160px; height: 90px; object-fit: cover; border-radius: 6px; background: #222; }
+      .status { font-weight: 600; }
+      .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; margin-left:8px; }
+      .green { background:#163d20; color:#51d37e; }
+      .red { background:#4b1f1f; color:#ff6b6b; }
+      .cloud span { margin: 6px; display:inline-block; }
+    </style>
+  </head>
+  <body>
+    <h1>Mobasher Monitor</h1>
+    <div class="grid">
+      <div class="box">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>Latest Screenshots</div>
+          <button id="refreshShots">Refresh</button>
+        </div>
+        <div id="shots" class="row"></div>
+      </div>
+      <div class="box">
+        <div>System Health</div>
+        <div id="health" class="status"></div>
+      </div>
+      <div class="box">
+        <div>Entities (24h)</div>
+        <div id="cloud" class="cloud"></div>
+      </div>
+      <div class="box">
+        <div>Entities by Label (24h)</div>
+        <div id="cloudByLabel" class="cloud"></div>
+      </div>
+    </div>
+    <script>
+      const API_HOST = (new URL(location)).searchParams.get('api_host') || '127.0.0.1';
+      const API_PORT = (new URL(location)).searchParams.get('api_port') || '8010';
+      const API_BASE = `http://${API_HOST}:${API_PORT}`;
+
+      async function fetchJSON(url){ const r = await fetch(url); return r.json(); }
+      function sizeForCount(c){ return 10 + Math.min(30, Math.log2(1 + c) * 8); }
+
+      async function loadScreenshots(){
+        const data = await fetchJSON(`${API_BASE}/screenshots?limit=12`);
+        const c = document.getElementById('shots'); c.innerHTML = '';
+        for (const it of (data.items||[])){
+          const img = document.createElement('img');
+          img.className = 'shot';
+          // If path is local file path, this preview may not load in browser; replace with your file server if needed.
+          img.src = it.screenshot_path.startsWith('http') ? it.screenshot_path : '';
+          img.alt = it.screenshot_path;
+          c.appendChild(img);
+        }
+      }
+
+      async function loadHealth(){
+        const h = await fetchJSON(`/health/summary`);
+        const el = document.getElementById('health');
+        el.innerHTML = `API: ${h.api} | DB: ${h.db} | Redis: ${h.redis}<br/>Segments(10m): ${h.segments_10m} | Transcripts(10m): ${h.transcripts_10m}`;
+        el.className = 'status';
+        const pill = document.createElement('span');
+        pill.className = 'pill ' + (h.status === 'green' ? 'green' : 'red');
+        pill.textContent = h.status.toUpperCase();
+        el.appendChild(pill);
+      }
+
+      async function loadCloud(){
+        const since = new Date(Date.now() - 24*3600*1000).toISOString();
+        const stats = await fetchJSON(`${API_BASE}/entities/stats?since=${encodeURIComponent(since)}`);
+        const c = document.getElementById('cloud'); c.innerHTML = '';
+        for (const it of (stats||[])){
+          const span = document.createElement('span');
+          span.textContent = it.text;
+          span.style.fontSize = sizeForCount(it.count) + 'px';
+          c.appendChild(span);
+        }
+      }
+
+      async function loadCloudByLabel(){
+        const since = new Date(Date.now() - 24*3600*1000).toISOString();
+        const stats = await fetchJSON(`${API_BASE}/entities/stats_by_label?since=${encodeURIComponent(since)}`);
+        const c = document.getElementById('cloudByLabel'); c.innerHTML = '';
+        for (const label of Object.keys(stats||{})){
+          const group = document.createElement('div');
+          group.textContent = label + ': ';
+          for (const it of stats[label]){
+            const span = document.createElement('span');
+            span.textContent = it.text;
+            span.style.fontSize = sizeForCount(it.count) + 'px';
+            group.appendChild(span);
+          }
+          c.appendChild(group);
+        }
+      }
+
+      document.getElementById('refreshShots').addEventListener('click', loadScreenshots);
+      loadScreenshots();
+      loadHealth();
+      loadCloud();
+      loadCloudByLabel();
+      setInterval(loadHealth, 15000);
+    </script>
+  </body>
+  </html>
+
+
