@@ -3,9 +3,12 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 import typer
+import json
+import time
+from datetime import datetime, timezone, timedelta
 
 app = typer.Typer(help="Mediaview CLI - manage recorder, database, services, tests, and info")
 
@@ -22,6 +25,183 @@ def _run(cmd: str, cwd: Optional[Path] = None) -> int:
 def version() -> None:
     """Show CLI version (derived from git)."""
     _run("git describe --tags --always | cat", cwd=_repo_root())
+# -------------------- Central short commands --------------------
+
+
+@app.command("status")
+def status(json_out: bool = typer.Option(False, "--json", help="Emit JSON output")) -> None:
+    """Show system health summary: DB, Redis, API, recent segments/transcripts."""
+    result: Dict[str, Any] = {
+        "db": {"status": "unknown"},
+        "redis": {"status": "unknown"},
+        "api": {"status": "unknown"},
+        "pipeline": {"segments_10m": 0, "transcripts_10m": 0},
+    }
+    exit_code = 0
+
+    # DB checks and recent counts
+    try:
+        from mobasher.storage.db import get_session, init_engine
+        from mobasher.storage.models import Segment, Transcript
+        init_engine()
+        with next(get_session()) as db:  # type: ignore
+            now = datetime.now(timezone.utc)
+            since = now - timedelta(minutes=10)
+            segs_10m = db.query(Segment).filter(Segment.started_at >= since).count()
+            trs_10m = (
+                db.query(Transcript)
+                .filter(Transcript.segment_started_at >= since)
+                .count()
+            )
+            result["pipeline"]["segments_10m"] = int(segs_10m)
+            result["pipeline"]["transcripts_10m"] = int(trs_10m)
+            result["db"]["status"] = "ok"
+    except Exception as e:
+        result["db"] = {"status": "error", "detail": str(e)}
+        exit_code = 1
+
+    # Redis
+    try:
+        import os as _os
+        import redis as _redis  # type: ignore
+        r = _redis.from_url(_os.environ.get("REDIS_URL", "redis://localhost:6379/0"))
+        pong = r.ping()
+        result["redis"]["status"] = "ok" if pong else "error"
+        if not pong:
+            exit_code = 1
+    except Exception as e:
+        result["redis"] = {"status": "error", "detail": str(e)}
+        exit_code = 1
+
+    # API
+    try:
+        import os as _os
+        import httpx  # type: ignore
+        host = _os.environ.get("API_HOST", "127.0.0.1")
+        port = int(_os.environ.get("API_PORT", "8010"))
+        url = f"http://{host}:{port}/health"
+        resp = httpx.get(url, timeout=2.0)
+        ok = (resp.status_code == 200 and resp.json().get("status") == "ok")
+        result["api"]["status"] = "ok" if ok else "error"
+        if not ok:
+            exit_code = 1
+    except Exception as e:
+        result["api"] = {"status": "error", "detail": str(e)}
+        exit_code = 1
+
+    # Overall status
+    all_ok = (
+        result["db"]["status"] == "ok"
+        and result["redis"]["status"] == "ok"
+        and result["api"]["status"] == "ok"
+    )
+    result["status"] = "green" if all_ok else "red"
+
+    if json_out:
+        typer.echo(json.dumps(result, default=str))
+    else:
+        typer.echo(
+            "\n".join(
+                [
+                    f"DB: {result['db']['status']}",
+                    f"Redis: {result['redis']['status']}",
+                    f"API: {result['api']['status']}",
+                    f"Segments (10m): {result['pipeline']['segments_10m']} | Transcripts (10m): {result['pipeline']['transcripts_10m']}",
+                    f"Overall: {result['status']}",
+                ]
+            )
+        )
+    raise typer.Exit(exit_code)
+
+
+channels_app = typer.Typer(help="Channels management")
+app.add_typer(channels_app, name="channels")
+
+
+@channels_app.command("list")
+def channels_list(
+    json_out: bool = typer.Option(False, "--json", help="Emit JSON output"),
+    active_only: bool = typer.Option(False, help="Show only active channels"),
+    limit: int = typer.Option(100, help="Max results"),
+    offset: int = typer.Option(0, help="Offset for pagination"),
+) -> None:
+    from mobasher.storage.db import get_session, init_engine
+    from mobasher.storage.repositories import list_channels as _list_channels
+    init_engine()
+    with next(get_session()) as db:  # type: ignore
+        items = _list_channels(db, active_only=active_only, limit=limit, offset=offset)
+        if json_out:
+            out = [
+                {
+                    "id": ch.id,
+                    "name": ch.name,
+                    "active": ch.active,
+                    "url": ch.url,
+                }
+                for ch in items
+            ]
+            typer.echo(json.dumps(out, default=str))
+        else:
+            for ch in items:
+                typer.echo(f"{ch.id}\t{ch.name}\t{'active' if ch.active else 'inactive'}")
+
+
+@channels_app.command("add")
+def channels_add(
+    channel_id: str = typer.Argument(..., help="Channel id (unique)"),
+    name: str = typer.Option(..., help="Channel display name"),
+    url: str = typer.Option(..., help="Stream URL"),
+    active: bool = typer.Option(True, help="Active flag"),
+    description: Optional[str] = typer.Option(None, help="Optional description"),
+) -> None:
+    from mobasher.storage.db import get_session, init_engine
+    from mobasher.storage.repositories import upsert_channel
+    init_engine()
+    with next(get_session()) as db:  # type: ignore
+        ch = upsert_channel(db, channel_id=channel_id, name=name, url=url, headers={}, active=active, description=description)
+        typer.echo(f"upserted channel: {ch.id} ({'active' if ch.active else 'inactive'})")
+
+
+@channels_app.command("enable")
+def channels_enable(channel_id: str = typer.Argument(...)) -> None:
+    from mobasher.storage.db import get_session, init_engine
+    from mobasher.storage.repositories import get_channel, upsert_channel
+    init_engine()
+    with next(get_session()) as db:  # type: ignore
+        ch = get_channel(db, channel_id)
+        if ch is None:
+            raise typer.Exit(2)
+        upsert_channel(
+            db,
+            channel_id=channel_id,
+            name=ch.name,
+            url=ch.url,
+            headers=ch.headers,
+            active=True,
+            description=ch.description,
+        )
+        typer.echo(f"enabled channel: {channel_id}")
+
+
+@channels_app.command("disable")
+def channels_disable(channel_id: str = typer.Argument(...)) -> None:
+    from mobasher.storage.db import get_session, init_engine
+    from mobasher.storage.repositories import get_channel, upsert_channel
+    init_engine()
+    with next(get_session()) as db:  # type: ignore
+        ch = get_channel(db, channel_id)
+        if ch is None:
+            raise typer.Exit(2)
+        upsert_channel(
+            db,
+            channel_id=channel_id,
+            name=ch.name,
+            url=ch.url,
+            headers=ch.headers,
+            active=False,
+            description=ch.description,
+        )
+        typer.echo(f"disabled channel: {channel_id}")
 
 
 recorder_app = typer.Typer(help="Recorder management")
