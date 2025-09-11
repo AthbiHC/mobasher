@@ -43,6 +43,16 @@ def enqueue_missing(
             ok = r.set(key, "1", nx=True, ex=dedupe_ttl_seconds)
             if not ok:
                 continue
+            try:
+                # mark queued
+                from mobasher.storage.models import Segment as _Seg
+                s = db.get(_Seg, (seg.id, seg.started_at))
+                if s is not None:
+                    s.asr_status = "queued"
+                    db.add(s)
+                    db.commit()
+            except Exception:
+                pass
             transcribe_segment.delay(str(seg.id), seg.started_at.isoformat())
             count += 1
     return count

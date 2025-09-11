@@ -117,8 +117,14 @@ def transcribe_segment(self, segment_id: str, segment_started_at_iso: str) -> di
                     ASR_TASK_OUTCOMES.labels(task="transcribe_segment", outcome="retry", channel_id=getattr(seg, "channel_id", "unknown")).inc()
                     raise self.retry(exc=e)
 
-            # increment attempts once we know channel_id
+            # mark processing and increment attempts once we know channel_id
             ASR_TASK_ATTEMPTS.labels(task="transcribe_segment", channel_id=seg.channel_id).inc()
+            try:
+                seg.asr_status = "processing"
+                db.add(seg)
+                db.commit()
+            except Exception:
+                pass
 
             # Resolve audio path to absolute if needed
             audio_path = _resolve_audio_path(seg.audio_path)
@@ -199,6 +205,18 @@ def transcribe_segment(self, segment_id: str, segment_started_at_iso: str) -> di
 
         # success metrics
         ASR_TASK_OUTCOMES.labels(task="transcribe_segment", outcome="success", channel_id=seg.channel_id).inc()
+        # mark completed
+        try:
+            from mobasher.storage.db import get_session as _gs
+            from mobasher.storage.models import Segment as _Seg
+            with next(_gs()) as db2:  # type: ignore
+                s2 = db2.get(_Seg, (UUID(segment_id), datetime.fromisoformat(segment_started_at_iso)))
+                if s2 is not None:
+                    s2.asr_status = "completed"
+                    db2.add(s2)
+                    db2.commit()
+        except Exception:
+            pass
         ASR_TASK_DURATION.labels(task="transcribe_segment", channel_id=seg.channel_id).observe(elapsed_ms / 1000.0)
         return {"ok": True, "elapsed_ms": elapsed_ms}
     except Exception:
@@ -208,6 +226,20 @@ def transcribe_segment(self, segment_id: str, segment_started_at_iso: str) -> di
         except Exception:
             ch = "unknown"
         ASR_TASK_OUTCOMES.labels(task="transcribe_segment", outcome="error", channel_id=ch).inc()
+        # mark failed
+        try:
+            from mobasher.storage.db import get_session as _gs
+            from mobasher.storage.models import Segment as _Seg
+            with next(_gs()) as db2:  # type: ignore
+                from datetime import datetime as _dt
+                from uuid import UUID as _UUID
+                s2 = db2.get(_Seg, (_UUID(segment_id), _dt.fromisoformat(segment_started_at_iso)))
+                if s2 is not None:
+                    s2.asr_status = "failed"
+                    db2.add(s2)
+                    db2.commit()
+        except Exception:
+            pass
         raise
 
 
