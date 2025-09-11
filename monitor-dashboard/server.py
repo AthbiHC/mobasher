@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 import httpx
@@ -60,5 +60,17 @@ async def health_summary() -> JSONResponse:
         pass
     out["status"] = "green" if out["api"] == "ok" else "red"
     return JSONResponse(out)
+
+
+@app.get("/shots")
+async def shots(p: str = Query(..., description="Absolute screenshot file path")) -> FileResponse:
+    root = os.environ.get("MOBASHER_SCREENSHOT_ROOT", "/Volumes/ExternalDB/Media-View-Data/data/screenshot")
+    rp = os.path.realpath(p)
+    rr = os.path.realpath(root)
+    if not rp.startswith(rr):
+        raise HTTPException(status_code=400, detail="path outside screenshot root")
+    if not os.path.exists(rp) or not os.path.isfile(rp):
+        raise HTTPException(status_code=404, detail="not found")
+    return FileResponse(rp)
 
 

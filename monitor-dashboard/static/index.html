@@ -56,7 +56,7 @@
           const img = document.createElement('img');
           img.className = 'shot';
           // If path is local file path, this preview may not load in browser; replace with your file server if needed.
-          img.src = it.screenshot_path.startsWith('http') ? it.screenshot_path : '';
+          img.src = it.screenshot_path.startsWith('http') ? it.screenshot_path : `/shots?p=${encodeURIComponent(it.screenshot_path)}`;
           img.alt = it.screenshot_path;
           c.appendChild(img);
         }
