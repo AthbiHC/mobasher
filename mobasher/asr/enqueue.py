@@ -38,6 +38,9 @@ def enqueue_missing(
     with next(get_session()) as db:  # type: ignore
         segs = list_segments_missing_transcripts(db, channel_id=channel_id, since=since, limit=limit)
         for seg in segs:
+            # Skip segments without audio_path (video-only rows should not be queued for ASR)
+            if not getattr(seg, 'audio_path', None):
+                continue
             key = f"asr:queued:{seg.id}:{seg.started_at.isoformat()}"
             # set NX: only if not exists
             ok = r.set(key, "1", nx=True, ex=dedupe_ttl_seconds)

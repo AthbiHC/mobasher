@@ -595,10 +595,23 @@ class DualHLSRecorder:
                     file_size_bytes=size,
                     status='completed',
                 )
+                # ASR status policy: only audio participates in ASR
+                # If this is a video-only segment (no audio yet), mark asr_status as completed to avoid "pending" noise
+                try:
+                    if media_type == 'video':
+                        seg.asr_status = 'completed'
+                except Exception:
+                    pass
                 session.add(seg)
             else:
                 if media_type == 'audio' and not existing.audio_path:
                     existing.audio_path = str(file_path)
+                    # Segment now has audio; ensure ASR will consider it
+                    try:
+                        if existing.asr_status == 'completed':
+                            existing.asr_status = 'pending'
+                    except Exception:
+                        pass
                 if media_type == 'video' and not existing.video_path:
                     existing.video_path = str(file_path)
                 if not existing.file_size_bytes or size > (existing.file_size_bytes or 0):

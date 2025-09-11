@@ -364,7 +364,7 @@ def list_segments_missing_transcripts(
         .limit(1)
     )
     stmt: Select = select(Segment).where(
-        Segment.audio_path.is_not(None),
+        Segment.audio_path.is_not(None),  # only segments with audio are eligible for ASR
         Segment.status == "completed",
         ~exists(tr_exists),
     )
