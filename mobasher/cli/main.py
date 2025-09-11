@@ -204,6 +204,11 @@ def channels_disable(channel_id: str = typer.Argument(...)) -> None:
         typer.echo(f"disabled channel: {channel_id}")
 
 
+# -------------------- Vision app (define early for use below) --------------------
+
+vision_app = typer.Typer(help="Vision pipeline")
+app.add_typer(vision_app, name="vision")
+
 # -------------------- Screenshots helpers --------------------
 
 screenshots_app = typer.Typer(help="Screenshots operations")
@@ -505,10 +510,6 @@ def asr_bench(
     cmd = f"python -m mobasher.asr.bench run {arg_paths} --models '{models}' --beam {beam} {vad_flag} {wts_flag}" + (f" --device {device}" if device else "")
     code = _run(cmd, cwd=_repo_root())
     raise typer.Exit(code)
-
-
-vision_app = typer.Typer(help="Vision pipeline")
-app.add_typer(vision_app, name="vision")
 
 
 @vision_app.command("worker")
