@@ -9,7 +9,8 @@ Usage:
   source mobasher/venv/bin/activate
   python -m mobasher.storage.retention_jobs --yes \
       --retain-transcripts-days 365 \
-      --retain-embeddings-days 365
+      --retain-embeddings-days 365 \
+      --retain-screenshots-days 90 [--screenshots-root /path/to/root]
 
 Notes:
   - Use --dry-run to see what would be deleted.
@@ -21,6 +22,8 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timedelta, timezone
 from typing import Tuple
+import os
+import shutil
 
 from sqlalchemy import text
 
@@ -45,7 +48,13 @@ def count_older_than(table: str) -> str:
     return f"SELECT count(*) FROM {table} WHERE segment_started_at < :cutoff"
 
 
-def run_cleanup(retain_transcripts_days: int, retain_embeddings_days: int, dry_run: bool) -> Tuple[int, int]:
+def run_cleanup(
+    retain_transcripts_days: int,
+    retain_embeddings_days: int,
+    retain_screenshots_days: int,
+    screenshots_root: str,
+    dry_run: bool,
+) -> Tuple[int, int, int]:
     engine = init_engine()
     now = datetime.now(timezone.utc)
     transcripts_cutoff = now - timedelta(days=retain_transcripts_days)
@@ -53,6 +62,7 @@ def run_cleanup(retain_transcripts_days: int, retain_embeddings_days: int, dry_r
 
     deleted_transcripts = 0
     deleted_embeddings = 0
+    deleted_screenshots = 0
 
     with engine.begin() as conn:
         # Transcripts
@@ -71,7 +81,28 @@ def run_cleanup(retain_transcripts_days: int, retain_embeddings_days: int, dry_r
             conn.execute(text(delete_older_than("segment_embeddings", embeddings_cutoff.isoformat())), {"cutoff": embeddings_cutoff})
         deleted_embeddings = int(to_delete_count)
 
-    return deleted_transcripts, deleted_embeddings
+    # Screenshots: delete files older than cutoff by filesystem mtime
+    try:
+        cutoff_ts = (now - timedelta(days=retain_screenshots_days)).timestamp()
+        root = screenshots_root or os.environ.get('MOBASHER_SCREENSHOT_ROOT', '')
+        if root and os.path.isdir(root):
+            for dirpath, dirnames, filenames in os.walk(root):
+                for fn in filenames:
+                    if not fn.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        continue
+                    fp = os.path.join(dirpath, fn)
+                    try:
+                        st = os.stat(fp)
+                        if st.st_mtime < cutoff_ts:
+                            deleted_screenshots += 1
+                            if not dry_run:
+                                os.remove(fp)
+                    except FileNotFoundError:
+                        pass
+    except Exception:
+        pass
+
+    return deleted_transcripts, deleted_embeddings, deleted_screenshots
 
 
 def main() -> None:
@@ -80,19 +111,23 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Show what would be deleted without deleting")
     parser.add_argument("--retain-transcripts-days", type=int, default=365)
     parser.add_argument("--retain-embeddings-days", type=int, default=365)
+    parser.add_argument("--retain-screenshots-days", type=int, default=90)
+    parser.add_argument("--screenshots-root", type=str, default="", help="Override MOBASHER_SCREENSHOT_ROOT")
     args = parser.parse_args()
 
     if not args.dry_run and not args.yes:
         parser.error("Refusing to run without --yes (or use --dry-run)")
 
-    deleted_transcripts, deleted_embeddings = run_cleanup(
+    deleted_transcripts, deleted_embeddings, deleted_screenshots = run_cleanup(
         retain_transcripts_days=args.retain_transcripts_days,
         retain_embeddings_days=args.retain_embeddings_days,
+        retain_screenshots_days=args.retain_screenshots_days,
+        screenshots_root=args.screenshots_root,
         dry_run=args.dry_run,
     )
 
     mode = "DRY-RUN" if args.dry_run else "DELETED"
-    print(f"{mode}: transcripts={deleted_transcripts}, embeddings={deleted_embeddings}")
+    print(f"{mode}: transcripts={deleted_transcripts}, embeddings={deleted_embeddings}, screenshots_files={deleted_screenshots}")
 
 
 if __name__ == "__main__":
