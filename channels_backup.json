@@ -1,0 +1,77 @@
+[
+  {
+    "id": "kuwait_news",
+    "name": "Kuwait News Channel",
+    "description": "Kuwait News Channel (Majlis) live stream",
+    "url": "https://kwtsplta.cdn.mangomolo.com/kb/smil:kb.stream.smil/chunklist.m3u8",
+    "headers": {
+      "Referer": "https://www.elahmad.com/",
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+    },
+    "active": true,
+    "created_at": "2025-09-12T11:45:25.925461+00:00",
+    "updated_at": "2025-09-12T11:45:25.925466+00:00"
+  },
+  {
+    "id": "al_ekhbariya",
+    "name": "Al Ekhbariya",
+    "description": "Saudi news channel",
+    "url": "https://shd-gcp-live.edgenextcdn.net/live/bitmovin-al-ekhbaria/297b3ef1cd0633ad9cfba7473a686a06/index.m3u8",
+    "headers": {},
+    "active": true,
+    "created_at": "2025-09-12T11:45:25.935180+00:00",
+    "updated_at": "2025-09-12T11:45:25.935184+00:00"
+  },
+  {
+    "id": "al_jazeera_ar",
+    "name": "Al Jazeera Arabic",
+    "description": "International Arabic news channel",
+    "url": "https://live-hls-web-aja-fa.thehlive.com/AJA/index.m3u8",
+    "headers": {},
+    "active": true,
+    "created_at": "2025-09-12T11:45:25.948232+00:00",
+    "updated_at": "2025-09-12T11:45:25.948236+00:00"
+  },
+  {
+    "id": "al_arabiya",
+    "name": "Al Arabiya",
+    "description": "Pan-Arab news channel",
+    "url": "https://shls-live-enc.edgenextcdn.net/out/v1/f5f319206ed740f9a831f2097c2ead23/index.m3u8",
+    "headers": {},
+    "active": true,
+    "created_at": "2025-09-12T11:45:25.953501+00:00",
+    "updated_at": "2025-09-12T11:45:25.953504+00:00"
+  },
+  {
+    "id": "skynews_arabia",
+    "name": "Sky News Arabia",
+    "description": "Arabic 24/7 news channel",
+    "url": "https://stream.skynewsarabia.com/hls/sna_720.m3u8",
+    "headers": {},
+    "active": true,
+    "created_at": "2025-09-12T11:45:25.958135+00:00",
+    "updated_at": "2025-09-12T11:45:25.958138+00:00"
+  },
+  {
+    "id": "cnbc_arabia",
+    "name": "CNBC Arabia",
+    "description": "Arabic business/markets news channel",
+    "url": "https://cnbc-live.akamaized.net/cnbc/master.m3u8",
+    "headers": {},
+    "active": true,
+    "created_at": "2025-09-12T11:45:25.963068+00:00",
+    "updated_at": "2025-09-12T11:45:25.963070+00:00"
+  },
+  {
+    "id": "al_jazeera",
+    "name": "Al Jazeera Arabic",
+    "description": null,
+    "url": "https://live-hls-web-aja-fa.thehlive.com/AJA/index.m3u8",
+    "headers": {
+      "User-Agent": "Mobasher/1.0"
+    },
+    "active": true,
+    "created_at": "2025-09-12T11:45:25.968095+00:00",
+    "updated_at": "2025-09-12T11:45:25.968098+00:00"
+  }
+]
