@@ -429,7 +429,7 @@ class ArchiveRecorder:
                     # Extract timestamp part after last dash
                     parts = filename.split('-')
                     if len(parts) >= 4:
-                        date_part = '-'.join(parts[-3:-1])  # YYYY-MM-DD
+                        date_part = '-'.join(parts[1:4])  # YYYY-MM-DD (skip channel name)
                         time_part = parts[-1]  # HHMMSS
                         
                         # Parse datetime
