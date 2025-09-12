@@ -587,14 +587,19 @@ def archive_stop() -> None:
 
 
 def _kill_processes() -> None:
-    """Stop recorder/ffmpeg and workers; close known metrics ports."""
+    """Stop recorder/ffmpeg, workers, API server; close known metrics and API ports."""
     root = _repo_root()
     _run("pkill -f 'ingestion/recorder.py' || true", cwd=root)
+    _run("pkill -f 'ingestion/archive_recorder.py' || true", cwd=root)
     _run("pkill -f \"ffmpeg.*Mobasher/1.0\" || true", cwd=root)
     _run("pkill -f \"ffmpeg.*Media-View/mobasher/data/\" || true", cwd=root)
     _run("pkill -f 'celery.*mobasher.asr.worker' || true", cwd=root)
     _run("pkill -f 'celery.*mobasher.vision.worker' || true", cwd=root)
-    for port in (9108, 9109, 9110):
+    _run("pkill -f 'celery.*mobasher.nlp.worker' || true", cwd=root)
+    _run("pkill -f 'uvicorn.*mobasher.api.app' || true", cwd=root)
+    _run("pkill -f 'mobasher.api.app' || true", cwd=root)
+    # Kill processes on known ports (API, recorder metrics, ASR metrics, NLP metrics, archive metrics)
+    for port in (8010, 9108, 9109, 9110, 9112, 9120, 9121):
         _run(f"PID=$(lsof -tiTCP:{port} -sTCP:LISTEN || true); [ -n \"$PID\" ] && kill -KILL $PID || true", cwd=root)
 
 
