@@ -18,6 +18,13 @@ import os
 from pathlib import Path
 from typing import List, Tuple
 
+# Load .env from repo root for standalone script execution
+try:
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=str(Path(__file__).resolve().parents[2] / ".env"), override=False)
+except Exception:
+    pass
+
 import numpy as np  # type: ignore
 import cv2  # type: ignore
 

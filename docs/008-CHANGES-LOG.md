@@ -65,3 +65,9 @@ This document tracks noteworthy changes, fixes, and operational learnings. Keep 
 ## 2025-09-06T14:20:00Z
 - Vision: added InsightFace-based face recognition (`vision.faces_segment`), configurable thresholds and gallery
 - Docs: updated TECH-STACK and COMMANDS for faces setup; PHASES marked as implemented
+
+## 2025-09-12T12:59:00Z
+- **DO Droplet Production Fix**: Fixed `DBSettings` model to ignore extra fields from .env using `model_config = {"extra": "ignore"}` 
+- **Commands Verified**: Both `kill-the-minions` and `freshreset` now work without errors on DO droplet with managed services
+- **Fresh Reset Behavior**: Confirmed `freshreset` preserves channels by default, cleans all files (.wav, .mp4, .jpg), and truncates DB tables properly
+- **Production Ready**: Central CLI (`PYTHONPATH=. venv/bin/python -m mobasher.cli.main`) tested and working with managed Postgres/Redis services

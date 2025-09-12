@@ -9,6 +9,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 import httpx
 
+# Ensure .env at repo root is loaded for this standalone app
+try:
+    from pathlib import Path
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=str(Path(__file__).resolve().parents[2] / ".env"), override=False)
+except Exception:
+    pass
 
 app = FastAPI(title="Mobasher Monitor Dashboard")
 

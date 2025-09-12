@@ -20,6 +20,13 @@ import hashlib
 from pathlib import Path
 from typing import Iterable
 
+# Load .env from repo root for standalone script execution
+try:
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=str(Path(__file__).resolve().parents[2] / ".env"), override=False)
+except Exception:
+    pass
+
 SPARQL_TEMPLATE = """
 # Humans with citizenship in Arab League countries, notable occupations, and Arabic Wikipedia pages
 PREFIX wdt: <http://www.wikidata.org/prop/direct/>

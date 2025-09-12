@@ -3,17 +3,17 @@
 This document captures a reproducible, step-by-step plan to validate the Mobasher system locally, including real outputs, issues encountered, and their fixes.
 
 ### Prerequisites
-- macOS with Docker Desktop
+- DO Droplet with managed Postgres/Redis services
 - Python venv at `mobasher/venv` with project requirements installed
-- Repo root: `/Users/athbialmutairi/Desktop/HAAC-Projects/Media-View`
+- Repo root: `/root/MediaView`
+- Working directory: `/root/MediaView/mobasher`
 
-### 1) Check and start Docker services
+### 1) Check managed services connectivity
 ```bash
-./scripts/mediaview services ps
-# If not running:
-./scripts/mediaview services up
+cd /root/MediaView/mobasher
+PYTHONPATH=. venv/bin/python -m mobasher.cli.main status
 ```
-Expected: `postgres` and `redis` containers show `Up` (health: starting/healthy).
+Expected: Redis: ok, DB: ok (managed services connected).
 
 ### 2) Verify Postgres readiness and schema
 ```bash
@@ -32,13 +32,15 @@ Expected: `PONG`.
 
 ### 4) Fresh reset (full wipe)
 ```bash
-./scripts/mediaview freshreset --yes --data-root /Volumes/ExternalDB/Media-View-Data/data
+cd /root/MediaView/mobasher
+PYTHONPATH=. venv/bin/python -m mobasher.cli.main freshreset --yes
 ```
 Expected: truncates DB (`recordings`, `segments`, `transcripts`, `visual_events`, `segment_embeddings`, `system_metrics`) and wipes data directories under the configured roots.
 
 Notes:
 - `freshreset` stops recorder/workers and closes common metrics ports.
-- Omit `--include-channels` to retain channel rows; recorder will re-ensure channels on use.
+- Channels are preserved by default (no `--include-channels` needed).
+- All files (.wav, .mp4, .jpg) are properly cleaned up.
 
 ### 5) Start API and verify
 ```bash

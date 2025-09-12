@@ -35,7 +35,7 @@ easyocr>=1.7.0
 
 # Audio/Video processing
 ffmpeg-python>=0.2.0
-pyav>=10.0.0
+av>=10.0.0
 librosa>=0.10.0
 soundfile>=0.12.0
 
@@ -58,6 +58,7 @@ pyyaml>=6.0
 python-multipart>=0.0.6
 httpx>=0.25.0
 aiofiles>=23.2.0
+python-dotenv>=1.0.0
 
 # Development
 pytest>=7.4.0

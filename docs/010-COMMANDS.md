@@ -4,22 +4,26 @@ This document catalogs common commands and workflows for developing, running, an
 
 ## 1) CLI
 
+### Local Development (macOS/Linux with Docker)
 - Preferred usage via wrapper: `./scripts/mediaview --help`
-- Examples:
-  - Start recorder: `./scripts/mediaview recorder start --config mobasher/channels/kuwait1.yaml`
-  - Status/Stop: `./scripts/mediaview recorder status` / `./scripts/mediaview recorder stop` (also cleans up lingering ffmpeg)
-  - API server: `./scripts/mediaview api serve --host 127.0.0.1 --port 8001` (add `--public` to bind 0.0.0.0)
-  - ASR worker (CPU, stable): `./scripts/mediaview asr worker` (requires Redis)
-    - For lower parallelism: `PYTHONPATH=. mobasher/venv/bin/python -m celery -A mobasher.asr.worker.app worker -c 2 --loglevel=INFO`
-    - Note: `ASR_DEVICE=metal` is not supported by faster-whisper here; use CPU or CUDA if available
-  - ASR ping: `./scripts/mediaview asr ping`
-  - ASR enqueue: `./scripts/mediaview asr enqueue --channel-id kuwait_news --since 2025-09-05T00:00:00Z --limit 50`
-  - ASR scheduler: `./scripts/mediaview asr scheduler --interval 30 --lookback 10`
-  - Truncate DB: `./scripts/mediaview db truncate --yes`
-  - Fresh reset: `./scripts/mediaview freshreset --yes [--today-only] [--data-root /path/to/data]`
-  - Kill all processes: `./scripts/mediaview kill-the-minions`
-  - Reset vision artifacts (manual): truncate `visual_events` and delete screenshots under `${MOBASHER_SCREENSHOT_ROOT:-/Volumes/ExternalDB/Media-View-Data/data/screenshot}`.
-  - Retention: `./scripts/mediaview db retention --dry-run`
+
+### Production (DO Droplet with Managed Services)
+- **Working directory**: `cd /root/MediaView/mobasher`
+- **Central CLI**: `PYTHONPATH=. venv/bin/python -m mobasher.cli.main`
+- **Alias suggestion**: `alias mobasher="cd /root/MediaView/mobasher && PYTHONPATH=. venv/bin/python -m mobasher.cli.main"`
+
+### Common Commands (adapt path as needed):
+- Start recorder: `mobasher recorder start --config channels/kuwait1.yaml --heartbeat 15 --metrics-port 9108`
+- Status/Stop: `mobasher recorder status` / `mobasher recorder stop` (also cleans up lingering ffmpeg)
+- API server: `mobasher api serve --host 0.0.0.0 --port 8010`
+- ASR worker: `mobasher asr worker --pool solo --concurrency 1 --metrics-port 9109` (requires Redis)
+- ASR ping: `mobasher asr ping`
+- ASR enqueue: `mobasher asr enqueue --limit 200`
+- ASR scheduler: `mobasher asr scheduler --interval 30 --lookback 10`
+- System status: `mobasher status --json`
+- Fresh reset: `mobasher freshreset --yes` (preserves channels, cleans all files)
+- Kill all processes: `mobasher kill-the-minions`
+- Channels: `mobasher channels list`
 
 ### Central short commands (new)
 - Status summary:

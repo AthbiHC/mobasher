@@ -12,4 +12,6 @@ This directory contains deep-dive documentation for each module of the Mobasher 
 - Future Modules & Improvements: `FUTURE.md`
 - Operational Runbooks: `RUNBOOKS.md`
 
+- Full installation: `../019-INSTALLATION-FULL.md`
+
 

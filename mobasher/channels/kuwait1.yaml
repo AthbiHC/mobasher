@@ -35,8 +35,8 @@ audio:
 video:
   # Encoder/preset/threads for CPU tuning (new)
   # macOS recommended defaults:
-  encoder: h264_videotoolbox      # Use 'libx264' for CPU encoding
-  preset: realtime                # With libx264, prefer 'veryfast' or 'superfast'
+  encoder: libx264                # Linux/CPU-friendly encoder
+  preset: veryfast                # Good balance for CPU
   threads: 2                      # Only used by libx264
   # Quality presets
   qualities:

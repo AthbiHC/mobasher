@@ -10,6 +10,7 @@ Provides:
 from __future__ import annotations
 
 from typing import Generator, Optional
+from urllib.parse import urlencode
 
 from pydantic_settings import BaseSettings
 from pydantic import Field
@@ -26,16 +27,21 @@ class DBSettings(BaseSettings):
     db_user: str = Field(default="mobasher", alias="DB_USER")
     db_password: str = Field(default="mobasher", alias="DB_PASSWORD")
     db_sslmode: Optional[str] = Field(default=None, alias="DB_SSLMODE")  # e.g., require/disable
+    db_schema: Optional[str] = Field(default=None, alias="DB_SCHEMA")  # optional: set search_path
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {"extra": "ignore", "env_file": ".env", "case_sensitive": False}
 
     def database_url(self) -> str:
         # Build a PostgreSQL URL compatible with psycopg
         base = f"postgresql+psycopg://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
+        params: dict[str, str] = {}
         if self.db_sslmode:
-            return f"{base}?sslmode={self.db_sslmode}"
+            params["sslmode"] = str(self.db_sslmode)
+        if self.db_schema:
+            # Use 'options' to set search_path; URL-encode as needed
+            params["options"] = f"-csearch_path={self.db_schema}"
+        if params:
+            return f"{base}?{urlencode(params)}"
         return base
 
 
