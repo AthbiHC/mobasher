@@ -595,11 +595,14 @@ class DualHLSRecorder:
                     file_size_bytes=size,
                     status='completed',
                 )
-                # ASR status policy: only audio participates in ASR
-                # If this is a video-only segment (no audio yet), mark asr_status as completed to avoid "pending" noise
+                # Pipeline status policy: set appropriate statuses based on available media
+                # Audio-only segments: no video to analyze, so vision_status = completed
+                # Video-only segments: no audio to transcribe, so asr_status = completed
                 try:
-                    if media_type == 'video':
-                        seg.asr_status = 'completed'
+                    if media_type == 'audio':
+                        seg.vision_status = 'completed'  # No video to analyze
+                    elif media_type == 'video':
+                        seg.asr_status = 'completed'     # No audio to transcribe
                 except Exception:
                     pass
                 session.add(seg)
@@ -614,6 +617,12 @@ class DualHLSRecorder:
                         pass
                 if media_type == 'video' and not existing.video_path:
                     existing.video_path = str(file_path)
+                    # Segment now has video; ensure vision will consider it
+                    try:
+                        if existing.vision_status == 'completed':
+                            existing.vision_status = 'pending'
+                    except Exception:
+                        pass
                 if not existing.file_size_bytes or size > (existing.file_size_bytes or 0):
                     existing.file_size_bytes = size
                 existing.ended_at = info['ended_at']
