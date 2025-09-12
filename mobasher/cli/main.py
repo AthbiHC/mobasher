@@ -43,7 +43,7 @@ def status(json_out: bool = typer.Option(False, "--json", help="Emit JSON output
     # DB checks and recent counts
     try:
         from mobasher.storage.db import get_session, init_engine
-        from mobasher.storage.models import Segment, Transcript
+        from mobasher.storage.models import Segment, Transcript, Recording
         init_engine()
         with next(get_session()) as db:  # type: ignore
             now = datetime.now(timezone.utc)
@@ -54,8 +54,21 @@ def status(json_out: bool = typer.Option(False, "--json", help="Emit JSON output
                 .filter(Transcript.segment_started_at >= since)
                 .count()
             )
+            
+            # Count recordings by type
+            total_recordings = db.query(Recording).count()
+            archive_recordings = db.query(Recording).filter(
+                Recording.extra.op('->>')('type') == 'archive'
+            ).count()
+            main_recordings = total_recordings - archive_recordings
+            
             result["pipeline"]["segments_10m"] = int(segs_10m)
             result["pipeline"]["transcripts_10m"] = int(trs_10m)
+            result["pipeline"]["recordings"] = {
+                "total": int(total_recordings),
+                "main": int(main_recordings), 
+                "archive": int(archive_recordings)
+            }
             result["db"]["status"] = "ok"
     except Exception as e:
         result["db"] = {"status": "error", "detail": str(e)}
@@ -106,6 +119,13 @@ def status(json_out: bool = typer.Option(False, "--json", help="Emit JSON output
             capture_output=True, text=True
         )
         result["processes"]["archive"] = "running" if archive_result.returncode == 0 else "stopped"
+        
+        # Check ASR worker
+        asr_result = subprocess.run(
+            ["pgrep", "-f", "celery.*mobasher.asr.worker"], 
+            capture_output=True, text=True
+        )
+        result["processes"]["asr"] = "running" if asr_result.returncode == 0 else "stopped"
     except Exception as e:
         result["processes"] = {"error": str(e)}
 
@@ -120,14 +140,18 @@ def status(json_out: bool = typer.Option(False, "--json", help="Emit JSON output
     if json_out:
         typer.echo(json.dumps(result, default=str))
     else:
+        recordings_info = result['pipeline'].get('recordings', {})
+        recordings_str = f"Recordings: {recordings_info.get('total', 0)} (Main: {recordings_info.get('main', 0)}, Archive: {recordings_info.get('archive', 0)})"
+        
         typer.echo(
             "\n".join(
                 [
                     f"DB: {result['db']['status']}",
                     f"Redis: {result['redis']['status']}",
                     f"API: {result['api']['status']}",
-                    f"Recorder: {result['processes']['recorder']} | Archive: {result['processes']['archive']}",
+                    f"Recorder: {result['processes']['recorder']} | Archive: {result['processes']['archive']} | ASR: {result['processes']['asr']}",
                     f"Segments (10m): {result['pipeline']['segments_10m']} | Transcripts (10m): {result['pipeline']['transcripts_10m']}",
+                    recordings_str,
                     f"Overall: {result['status']}",
                 ]
             )
