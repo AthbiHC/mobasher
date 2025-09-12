@@ -47,6 +47,13 @@ class DualHLSRecorder:
         self._create_directories()
         # Track run start to aid in test cleanup of extra full segments
         self.run_started_at: Optional[datetime] = None
+        
+        # Process monitoring for reliability
+        self.audio_restart_count = 0
+        self.video_restart_count = 0
+        self.last_audio_restart = datetime.now(timezone.utc)
+        self.last_video_restart = datetime.now(timezone.utc)
+        self.max_restarts_per_hour = 10
         # Initialize DB engine early so first write is fast
         try:
             from mobasher.storage.db import init_engine
@@ -158,8 +165,9 @@ class DualHLSRecorder:
         header_string = self._build_header_string(headers)
         audio_pattern = str(self.audio_dir / f"{self.channel_id}-%Y%m%d-%H%M%S.wav")
         cmd: List[str] = [
-            'ffmpeg', '-nostdin', '-loglevel', 'error',
-            '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
+            'ffmpeg', '-nostdin', '-loglevel', 'warning',  # More verbose for debugging
+            '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '30',
+            '-reconnect_at_eof', '1', '-timeout', '10000000',  # 10 second timeout
             '-user_agent', headers.get('User-Agent', 'Mobasher/1.0'),
         ]
         if header_string:
@@ -180,8 +188,9 @@ class DualHLSRecorder:
         v = self._get_video_params(self.video_quality)
         video_pattern = str(self.video_dir / f"{self.channel_id}-%Y%m%d-%H%M%S.mp4")
         cmd: List[str] = [
-            'ffmpeg', '-nostdin', '-loglevel', 'error',
-            '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
+            'ffmpeg', '-nostdin', '-loglevel', 'warning',  # More verbose for debugging  
+            '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '30',
+            '-reconnect_at_eof', '1', '-timeout', '10000000',  # 10 second timeout
             '-user_agent', headers.get('User-Agent', 'Mobasher/1.0'),
         ]
         if header_string:
@@ -260,18 +269,20 @@ class DualHLSRecorder:
         # Launch separate audio/video recorders for robustness
         if self.audio_enabled:
             audio_cmd = self._build_audio_command()
+            logger.info(f"Starting audio recorder: {' '.join(audio_cmd[:5])}...")
             self.process_audio_recorder = await asyncio.create_subprocess_exec(
                 *audio_cmd,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,  # Capture for debugging
+                stderr=asyncio.subprocess.PIPE,
                 preexec_fn=os.setsid,
             )
         if self.video_enabled:
             video_cmd = self._build_video_command()
+            logger.info(f"Starting video recorder: {' '.join(video_cmd[:5])}...")
             self.process_video_recorder = await asyncio.create_subprocess_exec(
                 *video_cmd,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,  # Capture for debugging
+                stderr=asyncio.subprocess.PIPE,
                 preexec_fn=os.setsid,
             )
         if self.archive_enabled:
@@ -581,9 +592,11 @@ class DualHLSRecorder:
             return
         from mobasher.storage.models import Segment
         seg_id = self._segment_uuid(info['started_at'])
+        logger.debug(f"Persisting {media_type} segment: {seg_id} | {info['started_at']} | {file_path.name}")
         with self._db_session() as session:
             existing = session.get(Segment, (seg_id, info['started_at']))
             if existing is None:
+                logger.debug(f"Creating new segment for {media_type}: {seg_id}")
                 seg = Segment(
                     id=seg_id,
                     recording_id=uuid.UUID(self.recording_id) if self.recording_id else None,
@@ -595,20 +608,17 @@ class DualHLSRecorder:
                     file_size_bytes=size,
                     status='completed',
                 )
-                # Pipeline status policy: set appropriate statuses based on available media
-                # Audio-only segments: no video to analyze, so vision_status = completed
-                # Video-only segments: no audio to transcribe, so asr_status = completed
-                try:
-                    if media_type == 'audio':
-                        seg.vision_status = 'completed'  # No video to analyze
-                    elif media_type == 'video':
-                        seg.asr_status = 'completed'     # No audio to transcribe
-                except Exception:
-                    pass
+                # Pipeline status policy: both audio and video are enabled, so both should start as pending
+                # The status will be updated when the corresponding media is added or determined to be missing
+                # Note: Default status is already 'pending' from the model, but being explicit here
+                seg.asr_status = 'pending'      # Will process audio when available
+                seg.vision_status = 'pending'   # Will process video when available
                 session.add(seg)
             else:
+                logger.debug(f"Updating existing segment for {media_type}: {seg_id} | audio={bool(existing.audio_path)} | video={bool(existing.video_path)}")
                 if media_type == 'audio' and not existing.audio_path:
                     existing.audio_path = str(file_path)
+                    logger.debug(f"Added audio_path to existing segment: {seg_id}")
                     # Segment now has audio; ensure ASR will consider it
                     try:
                         if existing.asr_status == 'completed':
@@ -617,6 +627,7 @@ class DualHLSRecorder:
                         pass
                 if media_type == 'video' and not existing.video_path:
                     existing.video_path = str(file_path)
+                    logger.debug(f"Added video_path to existing segment: {seg_id}")
                     # Segment now has video; ensure vision will consider it
                     try:
                         if existing.vision_status == 'completed':
@@ -629,6 +640,154 @@ class DualHLSRecorder:
                 existing.status = 'completed'
                 session.add(existing)
             session.commit()
+    
+    def _finalize_incomplete_segments(self) -> None:
+        """Mark segments as completed for missing media types after a reasonable delay."""
+        from mobasher.storage.models import Segment
+        from datetime import timedelta
+        
+        # Only finalize segments older than 2 minutes (2 segment cycles)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=2)
+        
+        with self._db_session() as session:
+            # Find segments that are missing audio or video and are old enough
+            incomplete_segments = session.query(Segment).filter(
+                Segment.started_at < cutoff_time,
+                Segment.channel_id == self.channel_id,
+                # Either missing audio or video
+                ((Segment.audio_path.is_(None) & Segment.asr_status.in_(['pending'])) |
+                 (Segment.video_path.is_(None) & Segment.vision_status.in_(['pending'])))
+            ).all()
+            
+            for seg in incomplete_segments:
+                if seg.audio_path is None and seg.asr_status == 'pending':
+                    seg.asr_status = 'completed'  # No audio to transcribe
+                    logger.debug(f"Marked segment {seg.id} asr_status=completed (no audio)")
+                    
+                if seg.video_path is None and seg.vision_status == 'pending':
+                    seg.vision_status = 'completed'  # No video to analyze  
+                    logger.debug(f"Marked segment {seg.id} vision_status=completed (no video)")
+                    
+                session.add(seg)
+            
+            if incomplete_segments:
+                session.commit()
+                logger.debug(f"Finalized {len(incomplete_segments)} incomplete segments")
+    
+    async def _monitor_processes(self) -> None:
+        """Monitor FFmpeg processes and restart them if they fail."""
+        now = datetime.now(timezone.utc)
+        
+        # Reset restart counters every hour
+        if (now - self.last_audio_restart).total_seconds() > 3600:
+            self.audio_restart_count = 0
+            self.last_audio_restart = now
+        if (now - self.last_video_restart).total_seconds() > 3600:
+            self.video_restart_count = 0
+            self.last_video_restart = now
+        
+        # Check audio process
+        if self.audio_enabled and self.process_audio_recorder:
+            if self.process_audio_recorder.returncode is not None:
+                # Process has terminated
+                logger.warning(f"Audio recorder process terminated with code {self.process_audio_recorder.returncode}")
+                if self.audio_restart_count < self.max_restarts_per_hour:
+                    logger.info("Restarting audio recorder...")
+                    await self._restart_audio_process()
+                else:
+                    logger.error("Audio recorder restart limit reached, disabling audio recording")
+                    self.audio_enabled = False
+        
+        # Check video process  
+        if self.video_enabled and self.process_video_recorder:
+            if self.process_video_recorder.returncode is not None:
+                # Process has terminated
+                logger.warning(f"Video recorder process terminated with code {self.process_video_recorder.returncode}")
+                if self.video_restart_count < self.max_restarts_per_hour:
+                    logger.info("Restarting video recorder...")
+                    await self._restart_video_process()
+                else:
+                    logger.error("Video recorder restart limit reached, disabling video recording")
+                    self.video_enabled = False
+    
+    async def _restart_audio_process(self) -> None:
+        """Restart the audio recording process."""
+        try:
+            if self.process_audio_recorder:
+                await self._stop_process(self.process_audio_recorder)
+            
+            audio_cmd = self._build_audio_command()
+            self.process_audio_recorder = await asyncio.create_subprocess_exec(
+                *audio_cmd,
+                stdout=asyncio.subprocess.PIPE,  # Capture output for debugging
+                stderr=asyncio.subprocess.PIPE,
+                preexec_fn=os.setsid,
+            )
+            self.audio_restart_count += 1
+            logger.info(f"Audio recorder restarted (attempt {self.audio_restart_count})")
+            
+        except Exception as e:
+            logger.error(f"Failed to restart audio process: {e}")
+            self.audio_enabled = False
+    
+    async def _restart_video_process(self) -> None:
+        """Restart the video recording process."""
+        try:
+            if self.process_video_recorder:
+                await self._stop_process(self.process_video_recorder)
+            
+            video_cmd = self._build_video_command()
+            self.process_video_recorder = await asyncio.create_subprocess_exec(
+                *video_cmd,
+                stdout=asyncio.subprocess.PIPE,  # Capture output for debugging
+                stderr=asyncio.subprocess.PIPE,
+                preexec_fn=os.setsid,
+            )
+            self.video_restart_count += 1
+            logger.info(f"Video recorder restarted (attempt {self.video_restart_count})")
+            
+        except Exception as e:
+            logger.error(f"Failed to restart video process: {e}")
+            self.video_enabled = False
+    
+    async def _validate_stream_health(self) -> Dict[str, bool]:
+        """Validate that the stream has both audio and video tracks available."""
+        stream_url = self.config['input']['url']
+        headers = self.config['input'].get('headers', {})
+        header_string = self._build_header_string(headers)
+        
+        cmd = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_streams']
+        if header_string:
+            cmd += ['-headers', header_string]
+        cmd += ['-user_agent', headers.get('User-Agent', 'Mobasher/1.0'), stream_url]
+        
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10.0)
+            
+            if proc.returncode == 0:
+                import json
+                probe_data = json.loads(stdout.decode())
+                streams = probe_data.get('streams', [])
+                
+                has_audio = any(s.get('codec_type') == 'audio' for s in streams)
+                has_video = any(s.get('codec_type') == 'video' for s in streams)
+                
+                return {'audio': has_audio, 'video': has_video}
+            else:
+                logger.warning(f"Stream probe failed: {stderr.decode()}")
+                return {'audio': False, 'video': False}
+                
+        except asyncio.TimeoutError:
+            logger.warning("Stream probe timeout")
+            return {'audio': False, 'video': False}
+        except Exception as e:
+            logger.warning(f"Stream probe error: {e}")
+            return {'audio': False, 'video': False}
 
 
 def load_channel_config(config_path: str) -> Dict[str, Any]:
@@ -686,6 +845,29 @@ async def main():
                 segs = await recorder.get_new_segments()
                 num_audio = sum(1 for s in segs if s['media_type'] == 'audio')
                 num_video = sum(1 for s in segs if s['media_type'] == 'video')
+                
+                # Finalize incomplete segments (mark missing media as completed)
+                recorder._finalize_incomplete_segments()
+                
+                # Monitor and restart failed processes
+                await recorder._monitor_processes()
+                
+                # Periodically validate stream health (every 5 minutes)
+                if int(time.time()) % 300 == 0:  # Every 5 minutes
+                    try:
+                        stream_health = await recorder._validate_stream_health()
+                        logger.info(f"Stream health check: audio={stream_health['audio']}, video={stream_health['video']}")
+                        
+                        # Disable recording for missing tracks
+                        if not stream_health['audio'] and recorder.audio_enabled:
+                            logger.warning("Stream has no audio track, disabling audio recording")
+                            recorder.audio_enabled = False
+                        if not stream_health['video'] and recorder.video_enabled:
+                            logger.warning("Stream has no video track, disabling video recording")  
+                            recorder.video_enabled = False
+                    except Exception as e:
+                        logger.warning(f"Stream health check failed: {e}")
+                
                 try:
                     recorder.metrics_heartbeat.labels(channel_id=recorder.channel_id).inc()
                     import time as _t

@@ -36,6 +36,7 @@ def status(json_out: bool = typer.Option(False, "--json", help="Emit JSON output
         "redis": {"status": "unknown"},
         "api": {"status": "unknown"},
         "pipeline": {"segments_10m": 0, "transcripts_10m": 0},
+        "processes": {"recorder": "unknown", "archive": "unknown"},
     }
     exit_code = 0
 
@@ -89,6 +90,25 @@ def status(json_out: bool = typer.Option(False, "--json", help="Emit JSON output
         result["api"] = {"status": "error", "detail": str(e)}
         exit_code = 1
 
+    # Process status
+    try:
+        import subprocess
+        # Check recorder
+        recorder_result = subprocess.run(
+            ["pgrep", "-f", "recorder.py"], 
+            capture_output=True, text=True
+        )
+        result["processes"]["recorder"] = "running" if recorder_result.returncode == 0 else "stopped"
+        
+        # Check archive
+        archive_result = subprocess.run(
+            ["pgrep", "-f", "archive_recorder.py"], 
+            capture_output=True, text=True
+        )
+        result["processes"]["archive"] = "running" if archive_result.returncode == 0 else "stopped"
+    except Exception as e:
+        result["processes"] = {"error": str(e)}
+
     # Overall status
     all_ok = (
         result["db"]["status"] == "ok"
@@ -106,6 +126,7 @@ def status(json_out: bool = typer.Option(False, "--json", help="Emit JSON output
                     f"DB: {result['db']['status']}",
                     f"Redis: {result['redis']['status']}",
                     f"API: {result['api']['status']}",
+                    f"Recorder: {result['processes']['recorder']} | Archive: {result['processes']['archive']}",
                     f"Segments (10m): {result['pipeline']['segments_10m']} | Transcripts (10m): {result['pipeline']['transcripts_10m']}",
                     f"Overall: {result['status']}",
                 ]
@@ -316,6 +337,54 @@ def recorder_start(
 def recorder_status() -> None:
     code = _run("pgrep -af 'ingestion/recorder.py' || echo 'Recorder not running'", cwd=_repo_root())
     raise typer.Exit(code)
+
+
+@recorder_app.command("start-with-archive")
+def recorder_start_with_archive(
+    config: str = typer.Option(..., help="Path to channel YAML"),
+    data_root: Optional[str] = typer.Option(None, help="Data root (overrides MOBASHER_DATA_ROOT)"),
+    heartbeat: int = typer.Option(15, help="Heartbeat seconds for main recorder"),
+    archive_duration_minutes: int = typer.Option(10, help="Archive segment duration in minutes"),
+    archive_mode: str = typer.Option("copy", help="Archive mode: copy|encode"),
+    daemon: bool = typer.Option(True, help="Run in background using nohup"),
+) -> None:
+    """Start both main recorder and archive recorder together."""
+    typer.echo("🚀 Starting main recorder and archive recorder...")
+    
+    # Start main recorder
+    typer.echo("📹 Starting main recorder...")
+    try:
+        recorder_start(
+            config=config,
+            data_root=data_root,
+            heartbeat=heartbeat,
+            daemon=daemon,
+            metrics_port=9108,
+        )
+    except typer.Exit:
+        pass  # Expected from subprocess call
+    
+    # Wait a moment for main recorder to start
+    import time
+    time.sleep(2)
+    
+    # Start archive recorder
+    typer.echo("🗃️ Starting archive recorder...")
+    try:
+        archive_start(
+            config=config,
+            data_root=data_root,
+            mode=archive_mode,
+            duration_minutes=archive_duration_minutes,
+            daemon=daemon,
+            metrics_port=9120,
+        )
+    except typer.Exit:
+        pass  # Expected from subprocess call
+    
+    typer.echo("✅ Both recorders started successfully!")
+    typer.echo("💡 Use 'mobasher status' to check their status")
+    raise typer.Exit(0)
 
 
 @recorder_app.command("stop")
@@ -534,8 +603,8 @@ def vision_enqueue(limit: int = typer.Option(20, help="How many segments to enqu
     raise typer.Exit(code)
 
 
-# Archive recorder commands
-archive_app = typer.Typer(help="Archive recorder (hour-aligned)")
+# Archive recorder commands  
+archive_app = typer.Typer(help="Archive recorder (configurable duration)")
 app.add_typer(archive_app, name="archive")
 
 
@@ -545,6 +614,7 @@ def archive_start(
     data_root: Optional[str] = typer.Option(None, help="Data root (overrides MOBASHER_DATA_ROOT)"),
     mode: str = typer.Option("copy", help="copy|encode"),
     quality: str = typer.Option("720p"),
+    duration_minutes: int = typer.Option(10, help="Archive segment duration in minutes"),
     thumbs: bool = typer.Option(True, help="Create thumbnails per archive file"),
     metrics_port: int = typer.Option(9120, help="Metrics port"),
     daemon: bool = typer.Option(True, help="Run in background via nohup"),
@@ -560,7 +630,7 @@ def archive_start(
     data_flag = f" --data-root {data_root}" if data_root else ""
     base = (
         f"{sys.executable} archive_recorder.py --config {cfg_path}{data_flag} "
-        f"--mode {mode} --quality {quality} {thumb_flag} --metrics-port {metrics_port}"
+        f"--mode {mode} --quality {quality} --duration-minutes {duration_minutes} {thumb_flag} --metrics-port {metrics_port}"
     )
     cmd = f"nohup {base} > archive_{Path(cfg_path).stem}.log 2>&1 &" if daemon else base
     typer.echo(f"Executing: {cmd}")
@@ -589,8 +659,8 @@ def archive_stop() -> None:
 def _kill_processes() -> None:
     """Stop recorder/ffmpeg, workers, API server; close known metrics and API ports."""
     root = _repo_root()
-    _run("pkill -f 'ingestion/recorder.py' || true", cwd=root)
-    _run("pkill -f 'ingestion/archive_recorder.py' || true", cwd=root)
+    _run("pkill -f 'recorder.py' || true", cwd=root)
+    _run("pkill -f 'archive_recorder.py' || true", cwd=root)
     _run("pkill -f \"ffmpeg.*Mobasher/1.0\" || true", cwd=root)
     _run("pkill -f \"ffmpeg.*Media-View/mobasher/data/\" || true", cwd=root)
     _run("pkill -f 'celery.*mobasher.asr.worker' || true", cwd=root)
