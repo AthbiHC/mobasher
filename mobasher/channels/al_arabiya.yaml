@@ -9,8 +9,8 @@ recording:
   video_enabled: true
   audio_enabled: true
 video:
-  encoder: h264_videotoolbox
-  preset: realtime
+  encoder: libx264
+  preset: veryfast
   threads: 2
   qualities:
     "720p": { resolution: "1280x720", bitrate: "2500k", fps: 25 }

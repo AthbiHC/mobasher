@@ -1,22 +1,101 @@
 id: al_jazeera
 name: Al Jazeera Arabic
+description: Al Jazeera Arabic live stream
+
 input:
   url: https://live-hls-web-aja-fa.thehlive.com/AJA/index.m3u8
   headers:
-    User-Agent: Mobasher/1.0
+    User-Agent: "Mobasher/1.0"
+  
 recording:
   segment_seconds: 60
-  video_enabled: true
-  audio_enabled: true
+  archive_mkv: false              # Use MP4 format
+  video_enabled: true             # Enable video recording
+  audio_enabled: true             # Enable audio recording
+  video_quality: "720p"           # Configurable quality
+  
+  # Archive recorder settings (10-minute segments for testing)
+  archive_enabled: true
+  archive_segment_seconds: 600    # 10 minute segments
+  archive_quality: "720p"         # Quality for viewing
+  
+  # Reconnection settings
+  reconnect_attempts: 5
+  reconnect_delay_max: 10
+
+audio:
+  sample_rate: 16000
+  channels: 1
+  format: "pcm_s16le"             # For ASR processing
+  bitrate: "128k"                 # For archive quality
+
 video:
-  encoder: h264_videotoolbox
-  preset: realtime
-  threads: 2
+  # Linux-compatible encoder configuration
+  encoder: libx264                # Cross-platform H.264 encoder
+  preset: veryfast                # Good balance for CPU efficiency
+  threads: 2                      # CPU thread usage
+  # Quality presets
   qualities:
-    "720p": { resolution: "1280x720", bitrate: "2500k", fps: 25 }
+    "720p":
+      resolution: "1280x720"
+      bitrate: "2500k"
+      fps: 25
+    "1080p":
+      resolution: "1920x1080" 
+      bitrate: "4500k"
+      fps: 25
+    "original":
+      resolution: "copy"
+      bitrate: "copy"
+      fps: "copy"
+
+asr:
+  model: "large-v3"
+  language: "ar"
+  beam_size: 5
+  vad_enabled: true
+  word_timestamps: true
+  condition_on_previous_text: true
+
+vision:
+  enabled: true
+  fps:
+    ocr: 1
+    objects: 2
+    faces: 1
+    scene_detection: 0.5
+  
+  models:
+    object_detection: "yolov8s.onnx"
+    face_recognition: "buffalo_l"
+    ocr_model: "arabic"
+  
+  face_gallery: "data/face_gallery/"
+  confidence_thresholds:
+    objects: 0.5
+    faces: 0.6
+    ocr: 0.7
+
+analysis:
+  embed_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  topic_detection: true
+  speaker_diarization: false
+  
 storage:
-  date_folders: true
-  channel_subdir: true
-  directories: { audio: audio, video: video, archive: archive }
+  media_root: "data/"
+  date_folders: true              # Enable YYYY-MM-DD folder structure
+  retention_days: 30
+  compression_enabled: true
+  
+  # Directory structure
+  directories:
+    audio: "audio"                # data/audio/YYYY-MM-DD/
+    video: "video"                # data/video/YYYY-MM-DD/
+    archive: "archive"            # data/archive/YYYY-MM-DD/
+
+monitoring:
+  metrics_enabled: true
+  health_check_interval: 30
+  log_level: "INFO"
 
 
