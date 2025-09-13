@@ -1,22 +1,31 @@
 # Project Status Snapshot
 
-Timestamp: 2025-09-07T19:20:00Z
-Branch: alpha-014
+Timestamp: 2025-09-13T15:20:00Z
+Branch: staging-live
 
 ## Phase progress
-- Phase 1 (API/Repos): done.
-- Phase 2 (ASR): done + options (cond_prev, initial_prompt, word_ts, normalization, bench WER/CER). Migration pending for `transcripts.text_norm` and `engine_time_ms` (added in models).
-- Phase 3 (Vision):
-  - OCR: ROI bands + preprocessing; per‑region screenshots; aggregated spans with start/end; confidence populated; dedup/smoothing implemented.
-  - Objects: YOLOv8 task added; running and writing `event_type=object`.
-  - Faces: InsightFace task scaffolded; runtime installed; model pack downloading; gallery support ready.
-  - API: `/visual-events` with filters (channel, type, region, time, q, min_conf).
+- Phase 1 (API/Repos): ✅ **COMPLETE** - Full API operational with health checks, pagination, filtering
+- Phase 2 (ASR): ✅ **COMPLETE** - Large-v3 model, Arabic language support, word timestamps, normalization
+- Phase 3 (Vision): 🔄 **IN PROGRESS** - OCR operational, objects detection ready, faces detection scaffolded
+- **Multi-Channel Deployment**: ✅ **PRODUCTION READY** - 6 channels recording simultaneously
 
-## Runtime notes
-- Recorders running on external data root: `/Volumes/ExternalDB/Media-View-Data/data`.
-- New archive recorder (hour-aligned) writing to `data/archive/<channel>/<YYYY-MM-DD>/` with thumbnails.
-- Fresh ops: `freshreset`, `kill-the-minions`. Recorder stop improved (kills ffmpeg and metrics ports).
- - Archive recorder check: after ~1h, no files found under `/Volumes/ExternalDB/Media-View-Data/data/archive/kuwait_news/2025-09-07` and process not running.
+## Critical Fixes Applied
+- **Video Recording Fix**: Replaced macOS-only `h264_videotoolbox` with Linux-compatible `libx264` across all channels
+- **Storage Architecture**: Properly integrated 500GB volume (/mnt/volume_ams3_03) replacing main filesystem usage
+- **Encoder Standardization**: All 6 channels now use consistent `libx264 + veryfast` configuration
+
+## Current Deployment Status
+- **System Load**: 50% CPU utilization on 16-core system with 6 simultaneous channels
+- **Memory Usage**: 4.6GB/32GB (86% available)
+- **Storage**: 500GB volume with <1% usage, properly mounted and operational  
+- **Channels Active**: 6/6 channels successfully recording audio + video
+- **Service Ports**: API (8010), Recorders (9108-9113), Archives (9120-9125)
+
+## Runtime Infrastructure
+- **Data Root**: `/mnt/volume_ams3_03/mediaview-data/data/` (symlinked to local `data/`)
+- **Archive**: 10-minute segments with thumbnails, copy mode for quality retention
+- **Database**: TimescaleDB with proper retention policies and fresh reset capability
+- **Monitoring**: Per-service metrics ports with Prometheus integration ready
 
 ## Current TODOs (at time of snapshot)
 - vision-faces-impl: Add face detection/recognition task (InsightFace SCRFD + ArcFace)

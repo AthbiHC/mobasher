@@ -9,6 +9,16 @@ This document tracks noteworthy changes, fixes, and operational learnings. Keep 
 
 ---
 
+## 2025-09-13T15:20:00Z
+- **CRITICAL FIX**: Video encoder compatibility issue resolved for Linux systems
+- **Issue**: Al Jazeera (and 4 other channels) using `h264_videotoolbox` (macOS-only), causing video recording failure
+- **Fix**: Replaced with `libx264` encoder + `veryfast` preset across all channels (al_jazeera, al_arabiya, al_ekhbariya, cnbc_arabia, sky_news_arabia)
+- **Impact**: All 6 channels now properly record both audio AND video on Linux
+- **Verification**: Multi-channel test successful - 6 channels recording simultaneously at 50% CPU load
+- **Storage**: Fixed volume mapping - data now uses 500GB attached volume instead of filling main filesystem
+- **Performance**: System handling 6-channel deployment with excellent resource utilization (16-core CPU, 32GB RAM)
+- **Architecture**: Complete fresh reset with proper volume integration and encoder standardization
+
 ## 2025-09-06T00:00:00Z
 - Recorder shutdown reliability: added SIGINT/SIGTERM/SIGHUP handlers and process-group kill to terminate child ffmpeg
 - CPU usage reduction: default hardware encoder on macOS (`h264_videotoolbox`), configurable `video.encoder/preset/threads`
