@@ -9,6 +9,17 @@ This document tracks noteworthy changes, fixes, and operational learnings. Keep 
 
 ---
 
+## 2025-09-15T15:15:00Z
+- **ARCHIVER FIX**: Resolved critical Python environment issue preventing database tracking
+- **Issue**: Archivers showed "No module named 'mobasher'" errors - files created but not DB-tracked
+- **Root Cause**: Missing PYTHONPATH causing module import failures in archive processes
+- **Fix**: Restarted archivers with proper environment (PYTHONPATH + venv activation)
+- **Automation**: Created `/scripts/start_archivers.sh` for consistent archiver startup with correct environment
+- **Impact**: Archive recordings now properly tracked (increased from 30 → 33), eliminating DB sync issues
+- **Performance Matrix**: Generated comprehensive recorder/archiver status report with 8,590 segments processed
+- **Coverage**: 4/6 channels recording, 3/6 channels archiving successfully after fixes
+- **Monitoring**: All archiver metrics endpoints restored (ports 9120-9125)
+
 ## 2025-09-13T15:20:00Z
 - **CRITICAL FIX**: Video encoder compatibility issue resolved for Linux systems
 - **Issue**: Al Jazeera (and 4 other channels) using `h264_videotoolbox` (macOS-only), causing video recording failure

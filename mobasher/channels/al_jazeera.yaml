@@ -16,7 +16,7 @@ recording:
   
   # Archive recorder settings (10-minute segments for testing)
   archive_enabled: true
-  archive_segment_seconds: 600    # 10 minute segments
+  archive_segment_seconds: 1800   # 30 minute segments
   archive_quality: "720p"         # Quality for viewing
   
   # Reconnection settings

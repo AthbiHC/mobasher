@@ -8,6 +8,11 @@ recording:
   segment_seconds: 60
   video_enabled: true
   audio_enabled: true
+  
+  # Archive recorder settings
+  archive_enabled: true
+  archive_segment_seconds: 1800   # 30 minute segments
+  archive_quality: "720p"         # Quality for viewing
 video:
   encoder: libx264
   preset: veryfast

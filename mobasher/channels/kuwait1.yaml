@@ -18,7 +18,7 @@ recording:
   
   # Archive recorder settings (1-hour segments for viewing)
   archive_enabled: true
-  archive_segment_seconds: 3600   # 1 hour segments
+  archive_segment_seconds: 1800   # 30 minute segments
   archive_quality: "1080p"        # Higher quality for viewing
   # Note: archive uses same encoder defaults as 'video' unless overridden in code
   

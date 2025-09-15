@@ -24,6 +24,7 @@
 ├── docs/                           # Documentation
 │   ├── Main-Document.md            # Comprehensive technical documentation
 │   ├── PROJECT-JOURNAL.md          # Development progress and decisions
+│   ├── CHANGES-LOG.md              # System changes and fixes log
 │   └── TODO.md                     # Current priorities and tasks
 └── mobasher/                       # Main application code
     ├── channels/                   # Channel configuration files
@@ -34,9 +35,12 @@
     ├── orchestration/              # Celery tasks and scheduling
     ├── monitoring/                 # Observability and dashboards
     ├── analysis/                   # Content analysis and embeddings
+    ├── scripts/                    # Automation and startup scripts
+    │   └── start_archivers.sh      # Archiver startup with env fixes
     ├── data/                       # Runtime data storage
     │   ├── audio/                  # Audio segments
-    │   └── recordings/             # Video recordings (optional)
+    │   ├── video/                  # Video recordings 
+    │   └── archive/                # Hour-aligned MP4 archives
     ├── state/                      # System state and metrics
     ├── docker/                     # Docker configurations
     ├── tests/                      # Test files
@@ -106,6 +110,15 @@ alembic upgrade head
 - **[Phases](docs/PHASES.md)** - Detailed development phases and acceptance criteria
 
 ## Development Workflow
+
+### System Status & Health Check
+```bash
+cd mobasher
+source venv/bin/activate
+python -m mobasher.cli.main status
+# Shows: DB, Redis, API, processes, recent activity
+```
+
 ### Run recorder (recommended via CLI)
 ```bash
 # Wrapper script
@@ -116,6 +129,24 @@ alembic upgrade head
 
 # View logs
 ./scripts/mediaview recorder logs -f
+```
+
+### Archive Management
+**Automated startup (recommended):**
+```bash
+cd mobasher
+./scripts/start_archivers.sh
+# Starts all 6 channel archivers with proper Python environment
+```
+
+**Manual archiver start:**
+```bash
+cd mobasher
+source venv/bin/activate
+export PYTHONPATH=/root/MediaView/mobasher:$PYTHONPATH
+python -m mobasher.ingestion.archive_recorder \
+    --config mobasher/channels/kuwait1.yaml \
+    --metrics-port 9120 --quality 720p --duration-minutes 30
 ```
 
 Alternative (manual background run):
