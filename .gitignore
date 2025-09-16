@@ -1,4 +1,9 @@
-# Python
+# Data and logs
+data/
+memory_alerts.log
+*.log
+
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
@@ -16,45 +21,16 @@ parts/
 sdist/
 var/
 wheels/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
-
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
 
 # Virtual environments
-.env
-.venv
-env/
 venv/
+env/
 ENV/
-env.bak/
-venv.bak/
 
-# IDEs
+# IDE
 .vscode/
 .idea/
 *.swp
@@ -63,76 +39,14 @@ venv.bak/
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Project specific
-data/
-recordings/
-audio/
-state/
-logs/
-*.log
-
-# Media files
-*.mp4
-*.mkv
-*.wav
-*.pcm
-*.ts
-
-# Model files
-*.onnx
-*.pt
-*.pth
-*.bin
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Configuration
-.env.local
-.env.production
-config/local.yaml
-config/production.yaml
-
 # Temporary files
-tmp/
-temp/
 *.tmp
 *.temp
+.cache/
 
-# Docker
-.dockerignore
-docker-compose.override.yml
-
-# Jupyter Notebooks
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# pipenv
-Pipfile.lock
-
-# poetry
-poetry.lock
-
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
-# Redis dump
-dump.rdb
-
-# Prometheus data
-prometheus_data/
-
-# Grafana data
-grafana_data/
+# Logs and databases
+*.db
+*.sqlite3.env
+.env.*

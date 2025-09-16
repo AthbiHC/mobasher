@@ -1,0 +1,45 @@
+[Unit]
+Description=Mobasher Archiver for %I
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/MediaView/mobasher
+Environment=PYTHONPATH=/root/MediaView/mobasher
+Environment=MOBASHER_DATA_ROOT=/mnt/volume_ams3_03/mediaview-data
+
+# Memory Management - CRITICAL for preventing OOM
+MemoryMax=2G
+MemoryHigh=1.5G
+MemorySwapMax=1G
+
+# CPU limits to prevent resource hogging  
+CPUQuota=200%
+
+# Restart policy for memory management
+Restart=always
+RestartSec=10s
+StartLimitInterval=60s
+StartLimitBurst=3
+
+# Runtime limits to prevent memory accumulation
+RuntimeMaxSec=4h
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30s
+
+ExecStartPre=/bin/bash -c 'source venv/bin/activate && python -c "import mobasher"'
+ExecStart=/bin/bash -c 'source venv/bin/activate && python -m mobasher.ingestion.archive_recorder --config mobasher/channels/%i.yaml --metrics-port 912%i --quality 720p --duration-minutes 30'
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mobasher-archiver-%i
+
+[Install]
+WantedBy=multi-user.target

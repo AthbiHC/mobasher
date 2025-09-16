@@ -1,0 +1,42 @@
+[Unit]
+Description=Mobasher Recorder for %I  
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/MediaView/mobasher
+Environment=PYTHONPATH=/root/MediaView/mobasher
+Environment=MOBASHER_DATA_ROOT=/mnt/volume_ams3_03/mediaview-data
+
+# Memory Management - Prevent OOM issues
+MemoryMax=1.5G
+MemoryHigh=1G  
+MemorySwapMax=512M
+
+# CPU limits
+CPUQuota=150%
+
+# Restart policy
+Restart=always
+RestartSec=15s
+StartLimitInterval=120s
+StartLimitBurst=5
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=45s
+
+ExecStartPre=/bin/bash -c 'source venv/bin/activate && python -c "import mobasher"'
+ExecStart=/bin/bash -c 'source venv/bin/activate && python recorder.py --config /root/MediaView/mobasher/mobasher/channels/%i.yaml --heartbeat 15 --metrics-port 910%i'
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mobasher-recorder-%i
+
+[Install]
+WantedBy=multi-user.target
